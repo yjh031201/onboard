@@ -17,6 +17,7 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
+  phone: string;
   role: string;
 }
 
@@ -37,10 +38,15 @@ export function login(email: string, password: string): Promise<AuthResponse> {
   });
 }
 
-export function signup(name: string, email: string, password: string): Promise<AuthResponse> {
+export function signup(
+  name: string,
+  email: string,
+  password: string,
+  phone: string,
+): Promise<AuthResponse> {
   return publicRequest<AuthResponse>("/api/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, phone }),
   }).then((auth) => {
     setSession(auth.accessToken, auth.user);
     return auth;
@@ -49,6 +55,26 @@ export function signup(name: string, email: string, password: string): Promise<A
 
 export function logout() {
   clearSession();
+}
+
+export interface FindIdResponse {
+  maskedEmail: string;
+}
+
+/** 이름+휴대폰번호로 본인 확인 후 마스킹된 이메일(아이디)을 돌려줌. */
+export function findId(name: string, phone: string): Promise<FindIdResponse> {
+  return publicRequest<FindIdResponse>("/api/auth/find-id", {
+    method: "POST",
+    body: JSON.stringify({ name, phone }),
+  });
+}
+
+/** 이름+이메일 일치 확인 후 새 비밀번호로 즉시 교체 (이메일 발송 없는 간소화된 플로우). */
+export function resetPassword(name: string, email: string, newPassword: string): Promise<void> {
+  return publicRequest<void>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ name, email, newPassword }),
+  });
 }
 
 export function getStoredUser(): AuthUser | null {

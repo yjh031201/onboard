@@ -38,6 +38,9 @@ public class User {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(nullable = false, unique = true, length = 20)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role = UserRole.MEMBER;
@@ -45,11 +48,28 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public User(String email, String password, String name) {
+    public User(String email, String password, String name, String phone) {
         this.email = email;
         this.password = password;
         this.name = name;
+        this.phone = phone;
         this.role = UserRole.MEMBER;
+    }
+
+    /** 비밀번호 재설정 전용 — 반드시 이미 인코딩된(BCrypt) 값을 넘길 것. */
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    /** 개인설정에서 이름/휴대폰번호 수정할 때 사용. */
+    public void changeProfile(String name, String phone) {
+        this.name = name;
+        this.phone = phone;
+    }
+
+    /** 팀원 권한 변경 시 사용 — OWNER/ADMIN만 호출 가능하도록 UserService에서 제한. */
+    public void changeRole(UserRole role) {
+        this.role = role;
     }
 
     @jakarta.persistence.PrePersist

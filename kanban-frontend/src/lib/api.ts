@@ -30,6 +30,11 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
+/** 토큰은 그대로 두고 캐시된 유저 정보만 갱신 (프로필 수정 후 사용). */
+export function updateStoredUser(user: unknown) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 export function getStoredUser<T = unknown>(): T | null {
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;

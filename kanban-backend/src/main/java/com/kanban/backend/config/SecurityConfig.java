@@ -36,8 +36,13 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // signup/login만 인증 없이 허용. /api/auth/me 등 나머지는 토큰 필요.
-                        .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
+                        // 로그인 전에 호출돼야 하는 엔드포인트만 인증 없이 허용. /api/auth/me 등 나머지는 토큰 필요.
+                        .requestMatchers(
+                                "/api/auth/signup",
+                                "/api/auth/login",
+                                "/api/auth/find-id",
+                                "/api/auth/reset-password"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
