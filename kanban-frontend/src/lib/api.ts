@@ -56,10 +56,14 @@ async function toResult<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** 로그인 없이 호출하는 API (회원가입, 로그인 등). */
+/**
+ * 로그인 없이 호출하는 API (회원가입, 로그인 등).
+ * refresh token은 응답 body가 아니라 httpOnly 쿠키로 내려오므로 credentials: "include" 필수.
+ */
 export async function publicRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -82,6 +86,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

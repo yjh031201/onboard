@@ -5,6 +5,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
 import FindIdPage from "./pages/auth/FindIdPage";
 import FindPasswordPage from "./pages/auth/FindPasswordPage";
+import OAuthCallbackPage from "./pages/auth/OAuthCallbackPage";
 import KanbanPage from "./pages/kanban/KanbanPage";
 import TimelinePage from "./pages/timeline/TimelinePage";
 import MembersPage from "./pages/members/MembersPage";
@@ -18,6 +19,7 @@ function App() {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/find-id" element={<FindIdPage />} />
       <Route path="/find-password" element={<FindPasswordPage />} />
+      <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
 
       <Route element={<AppLayout />}>
         <Route index element={<Dashboard />} />

@@ -107,12 +107,37 @@ npm run dev
 - **프로젝트 설정 API**: `GET/PUT /api/settings` (수정은 OWNER/ADMIN만, 백엔드만)
 - **일정(캘린더) API**: `GET/POST/PUT/DELETE /api/schedules` (수정/삭제는 작성자 본인 또는 OWNER/ADMIN만, 백엔드만)
 - **파일 업로드 API**: `GET/POST/DELETE /api/files`, `GET /api/files/{id}/download` — 로컬 디스크 저장 (백엔드만)
+- **구글 / 네이버 로그인**: `/oauth2/authorization/google`, `/oauth2/authorization/naver` — 프론트 로그인 페이지 버튼까지 연동됨 (설정 방법은 아래 참고)
 
 **아직 미구현:**
 - 아이디 찾기 / 비밀번호 찾기 — 화면(UI)만 있고 백엔드 API 없음
 - 칸반보드 카드 CRUD, 실시간 동기화 등 — 프론트 화면만 있고 백엔드 연동 전
 - 위 설정/일정/파일 API들의 프론트엔드 화면 연동
 - 파일 업로드 S3 저장 (`FileStorageService` 인터페이스만 있고 구현체는 로컬 전용)
+
+## 구글 / 네이버 로그인 설정
+
+기본값(`dummy-...`)만 있으면 앱은 정상 기동하지만, 버튼을 눌러도 구글/네이버가 "잘못된 클라이언트"라고
+막습니다. 실제로 로그인이 되게 하려면 아래처럼 직접 앱을 등록해야 합니다 (계정당 한 번만 하면 됨).
+
+**구글**: [Google Cloud Console → API 및 서비스 → 사용자 인증 정보](https://console.cloud.google.com/apis/credentials)에서
+OAuth 클라이언트 ID 생성 → 승인된 리디렉션 URI에 `http://localhost:8080/login/oauth2/code/google` 추가.
+
+**네이버**: [네이버 개발자센터 → 애플리케이션 등록](https://developers.naver.com/apps)에서 앱 생성,
+사용 API에 "네이버 로그인" 추가(이름/이메일 제공 동의 필수) → 콜백 URL에
+`http://localhost:8080/login/oauth2/code/naver` 등록.
+
+발급받은 값은 `kanban-backend`를 실행하는 터미널/IntelliJ Run Configuration에 환경변수로 넣어주세요:
+
+```
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+NAVER_CLIENT_ID=...
+NAVER_CLIENT_SECRET=...
+```
+
+로그인 성공/실패 후에는 백엔드가 `FRONTEND_BASE_URL`(기본값 `http://localhost:5173`)로 리다이렉트합니다.
+프론트를 다른 포트로 띄웠다면 이 값도 같이 맞춰주고, `SecurityConfig`의 CORS 허용 목록에도 추가해야 합니다.
 
 ## DB 접속 정보 (로컬 개발용)
 

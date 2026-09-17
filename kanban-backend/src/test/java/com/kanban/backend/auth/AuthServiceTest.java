@@ -6,11 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.kanban.backend.auth.dto.AuthResponse;
+import com.kanban.backend.auth.oauth2.OAuthCodeExchangeService;
 import com.kanban.backend.auth.dto.LoginRequest;
 import com.kanban.backend.auth.dto.SignupRequest;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.config.JwtTokenProvider;
+import com.kanban.backend.user.AuthProvider;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRepository;
 import java.util.Optional;
@@ -27,6 +28,7 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
     private RefreshTokenStore refreshTokenStore;
+    private OAuthCodeExchangeService oAuthCodeExchangeService;
     private AuthService authService;
 
     @BeforeEach
@@ -35,12 +37,14 @@ class AuthServiceTest {
         passwordEncoder = new BCryptPasswordEncoder();
         jwtTokenProvider = mock(JwtTokenProvider.class);
         refreshTokenStore = mock(RefreshTokenStore.class);
+        oAuthCodeExchangeService = mock(OAuthCodeExchangeService.class);
         when(jwtTokenProvider.createToken(any(), any())).thenReturn("fake-jwt-token");
         when(jwtTokenProvider.createRefreshToken(any(), any())).thenReturn("fake-refresh-token");
         when(jwtTokenProvider.getExpirationMs()).thenReturn(86_400_000L);
         when(jwtTokenProvider.getRefreshExpirationMs()).thenReturn(1_209_600_000L);
 
-        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider, refreshTokenStore);
+        authService = new AuthService(
+                userRepository, passwordEncoder, jwtTokenProvider, refreshTokenStore, oAuthCodeExchangeService);
     }
 
     @Test
@@ -53,11 +57,12 @@ class AuthServiceTest {
             return saved;
         });
 
-        AuthResponse response = authService.signup(request);
+        AuthResult result = authService.signup(request);
 
-        assertThat(response.accessToken()).isEqualTo("fake-jwt-token");
-        assertThat(response.user().email()).isEqualTo(request.email());
-        assertThat(response.user().name()).isEqualTo(request.name());
+        assertThat(result.body().accessToken()).isEqualTo("fake-jwt-token");
+        assertThat(result.refreshToken()).isEqualTo("fake-refresh-token");
+        assertThat(result.body().user().email()).isEqualTo(request.email());
+        assertThat(result.body().user().name()).isEqualTo(request.name());
     }
 
     @Test
@@ -76,10 +81,10 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(user, "id", 1L);
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
 
-        AuthResponse response = authService.login(new LoginRequest(user.getEmail(), "password123"));
+        AuthResult result = authService.login(new LoginRequest(user.getEmail(), "password123"));
 
-        assertThat(response.accessToken()).isEqualTo("fake-jwt-token");
-        assertThat(response.user().email()).isEqualTo(user.getEmail());
+        assertThat(result.body().accessToken()).isEqualTo("fake-jwt-token");
+        assertThat(result.body().user().email()).isEqualTo(user.getEmail());
     }
 
     @Test
@@ -101,6 +106,16 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_rejectsSocialOnlyAccountWithoutPassword() {
+        User user = new User("jdbdjhd8q@gmail.com", "양종호", AuthProvider.GOOGLE, "google-sub-1");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest(user.getEmail(), "anything")))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
     void refresh_issuesNewTokenWhenStoredValueMatches() {
         User user = new User("jdbdjhd8q@gmail.com", passwordEncoder.encode("password123"), "양종호");
         ReflectionTestUtils.setField(user, "id", 1L);
@@ -108,10 +123,10 @@ class AuthServiceTest {
         when(refreshTokenStore.isValid(1L, "valid-refresh-token")).thenReturn(true);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
-        AuthResponse response = authService.refresh("valid-refresh-token");
+        AuthResult result = authService.refresh("valid-refresh-token");
 
-        assertThat(response.accessToken()).isEqualTo("fake-jwt-token");
-        assertThat(response.user().email()).isEqualTo(user.getEmail());
+        assertThat(result.body().accessToken()).isEqualTo("fake-jwt-token");
+        assertThat(result.body().user().email()).isEqualTo(user.getEmail());
     }
 
     @Test
@@ -121,5 +136,18 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refresh("stale-refresh-token"))
                 .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void exchangeOAuthCode_issuesTokenForRedeemedUser() {
+        User user = new User("jdbdjhd8q@gmail.com", "양종호", AuthProvider.GOOGLE, "google-sub-1");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        when(oAuthCodeExchangeService.redeem("valid-code")).thenReturn(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        AuthResult result = authService.exchangeOAuthCode("valid-code");
+
+        assertThat(result.body().accessToken()).isEqualTo("fake-jwt-token");
+        assertThat(result.body().user().email()).isEqualTo(user.getEmail());
     }
 }
