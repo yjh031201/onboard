@@ -26,6 +26,7 @@ class AuthServiceTest {
     private UserRepository userRepository;
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
+    private RefreshTokenStore refreshTokenStore;
     private AuthService authService;
 
     @BeforeEach
@@ -33,10 +34,13 @@ class AuthServiceTest {
         userRepository = mock(UserRepository.class);
         passwordEncoder = new BCryptPasswordEncoder();
         jwtTokenProvider = mock(JwtTokenProvider.class);
+        refreshTokenStore = mock(RefreshTokenStore.class);
         when(jwtTokenProvider.createToken(any(), any())).thenReturn("fake-jwt-token");
+        when(jwtTokenProvider.createRefreshToken(any(), any())).thenReturn("fake-refresh-token");
         when(jwtTokenProvider.getExpirationMs()).thenReturn(86_400_000L);
+        when(jwtTokenProvider.getRefreshExpirationMs()).thenReturn(1_209_600_000L);
 
-        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider);
+        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider, refreshTokenStore);
     }
 
     @Test
@@ -94,5 +98,28 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("nobody@example.com", "password123")))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void refresh_issuesNewTokenWhenStoredValueMatches() {
+        User user = new User("jdbdjhd8q@gmail.com", passwordEncoder.encode("password123"), "양종호");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        when(jwtTokenProvider.parseRefreshUserId("valid-refresh-token")).thenReturn(Optional.of(1L));
+        when(refreshTokenStore.isValid(1L, "valid-refresh-token")).thenReturn(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        AuthResponse response = authService.refresh("valid-refresh-token");
+
+        assertThat(response.accessToken()).isEqualTo("fake-jwt-token");
+        assertThat(response.user().email()).isEqualTo(user.getEmail());
+    }
+
+    @Test
+    void refresh_rejectsTokenNotMatchingStoredValue() {
+        when(jwtTokenProvider.parseRefreshUserId("stale-refresh-token")).thenReturn(Optional.of(1L));
+        when(refreshTokenStore.isValid(1L, "stale-refresh-token")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.refresh("stale-refresh-token"))
+                .isInstanceOf(ApiException.class);
     }
 }

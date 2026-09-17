@@ -20,6 +20,13 @@ onboard/
 
 > Maven은 따로 설치 안 해도 됩니다. `kanban-backend`에 있는 `mvnw`(맥/리눅스) / `mvnw.cmd`(윈도우) 래퍼가 최초 실행 시 알아서 받아옵니다.
 
+## CI
+
+`master`로의 PR/push마다 GitHub Actions가 자동으로 돈다 (`.github/workflows/`):
+
+- **backend-ci.yml**: `kanban-backend/**` 변경 시 `mvnw test` (H2라 Docker 불필요)
+- **frontend-ci.yml**: `kanban-frontend/**` 변경 시 `npm ci && npm run lint && npm run build`
+
 ## Git 브랜치 규칙
 
 **`master`(또는 `main`)에 직접 push 금지.** 각자 브랜치 만들어서 작업하고, PR(Pull Request)로 리뷰 후 머지합니다.
@@ -96,10 +103,16 @@ npm run dev
 - **회원가입 / 로그인**: 프론트 ↔ 백엔드(`/api/auth/signup`, `/api/auth/login`) 완전히 연동됨. JWT 발급, BCrypt 비밀번호 해싱.
 - **내 정보 조회**: `GET /api/auth/me` (토큰 필요)
 - 로그인 상태면 화면 우측 상단에 이름/아바타 표시(클릭 시 로그아웃), 비로그인 상태면 로그인 버튼 표시
+- **Refresh Token**: `/api/auth/refresh`, `/api/auth/logout` — Redis에 저장, 로그아웃 시 즉시 무효화 (백엔드 API만 있음, 프론트 연동 전)
+- **프로젝트 설정 API**: `GET/PUT /api/settings` (수정은 OWNER/ADMIN만, 백엔드만)
+- **일정(캘린더) API**: `GET/POST/PUT/DELETE /api/schedules` (수정/삭제는 작성자 본인 또는 OWNER/ADMIN만, 백엔드만)
+- **파일 업로드 API**: `GET/POST/DELETE /api/files`, `GET /api/files/{id}/download` — 로컬 디스크 저장 (백엔드만)
 
 **아직 미구현:**
 - 아이디 찾기 / 비밀번호 찾기 — 화면(UI)만 있고 백엔드 API 없음
 - 칸반보드 카드 CRUD, 실시간 동기화 등 — 프론트 화면만 있고 백엔드 연동 전
+- 위 설정/일정/파일 API들의 프론트엔드 화면 연동
+- 파일 업로드 S3 저장 (`FileStorageService` 인터페이스만 있고 구현체는 로컬 전용)
 
 ## DB 접속 정보 (로컬 개발용)
 
@@ -119,6 +132,34 @@ DB 직접 접속해서 확인하고 싶을 때:
 docker exec -it kanban-mysql mysql -ukanban -pkanban1234 kanban -e "SELECT id, email, name, role, created_at FROM users;"
 ```
 
+## DB 스키마 관리 (Flyway)
+
+테이블은 더 이상 Hibernate가 자동으로 만들지 않습니다(`ddl-auto: validate`). 스키마는 전부
+`kanban-backend/src/main/resources/db/migration/V{번호}__설명.sql` 마이그레이션 파일로 관리하고,
+앱이 뜰 때 Flyway가 자동으로 적용합니다.
+
+- 엔티티에 컬럼/테이블을 추가·변경했으면 **기존 파일을 고치지 말고** 새 버전 파일을 추가하세요.
+  예: `V2__add_board_tables.sql`
+- 테스트(`mvnw test`)는 지금처럼 H2 + Hibernate `create-drop`을 쓰고 Flyway는 꺼져 있습니다
+  (`application-test.yml`) — 마이그레이션 파일과 별개로 동작하니 신경 안 써도 됩니다.
+
+## 배포 (Docker)
+
+로컬 개발은 지금처럼 `docker compose up -d`(DB/Redis만) + `mvnw` + `npm run dev` 조합을 그대로 씁니다.
+아래는 백엔드/프론트까지 컨테이너로 띄우는 **배포용** 별도 구성입니다.
+
+```
+cp .env.example .env          # 값 채우기 (비밀번호, JWT 시크릿 등)
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+- 프론트: `http://localhost` (nginx, 80포트)
+- 백엔드: `http://localhost:8080`
+- `kanban-backend/Dockerfile`, `kanban-frontend/Dockerfile` 각각 멀티스테이지 빌드
+- 프론트 Dockerfile은 빌드 시점에 `VITE_API_BASE_URL`을 박아 넣으므로, 배포 도메인이 바뀌면
+  `.env`의 값을 바꾸고 다시 빌드해야 함
+- CORS 허용 origin은 `CORS_ALLOWED_ORIGINS` 환경변수로 관리 (콤마로 여러 개 가능)
+
 ## 자주 발생하는 문제
 
 **`Public Key Retrieval is not allowed`**
@@ -131,7 +172,7 @@ docker exec -it kanban-mysql mysql -ukanban -pkanban1234 kanban -e "SELECT id, e
 → 컴파일에 쓰이는 Java가 21 미만. `java -version` 확인 후 JDK 21로 `JAVA_HOME` 설정.
 
 **Spring Boot 앱은 뜨는데 프론트에서 API 호출이 실패함**
-→ 백엔드가 먼저 켜져 있는지, `docker ps`로 MySQL이 healthy인지 확인. CORS는 `http://localhost:5173`만 허용되어 있으니 다른 포트로 프론트를 띄웠다면 백엔드 `SecurityConfig`의 CORS 설정도 맞춰야 함.
+→ 백엔드가 먼저 켜져 있는지, `docker ps`로 MySQL/Redis가 healthy인지 확인. CORS는 기본값이 `http://localhost:5173`만 허용이니 다른 포트로 프론트를 띄웠다면 `CORS_ALLOWED_ORIGINS` 환경변수(또는 `application.yml`의 `app.cors.allowed-origins`)에 추가해야 함.
 
 ## 테스트 실행 (백엔드)
 

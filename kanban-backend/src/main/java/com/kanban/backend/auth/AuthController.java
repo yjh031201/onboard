@@ -2,6 +2,7 @@ package com.kanban.backend.auth;
 
 import com.kanban.backend.auth.dto.AuthResponse;
 import com.kanban.backend.auth.dto.LoginRequest;
+import com.kanban.backend.auth.dto.RefreshRequest;
 import com.kanban.backend.auth.dto.SignupRequest;
 import com.kanban.backend.auth.dto.UserResponse;
 import com.kanban.backend.user.User;
@@ -39,5 +40,16 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(UserResponse.from(user));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.refresh(request.refreshToken()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal User user) {
+        authService.logout(user.getId());
+        return ResponseEntity.noContent().build();
     }
 }

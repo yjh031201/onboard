@@ -5,6 +5,9 @@
 .idea/
 *.iml
 
+# 로컬 IDE MCP 연동 설정 (로컬 포트 등 개인 환경값이라 공유 대상 아님)
+.mcp.json
+
 # Claude(Cowork) 데스크톱 앱이 자동으로 만드는 폴더 — 프로젝트 코드 아님
 Claude outputs/
 
@@ -15,3 +18,8 @@ Thumbs.db
 # 에디터
 .vscode/*
 !.vscode/extensions.json
+
+# docker-compose.prod.yml 배포용 환경변수 (.env.example만 커밋)
+.env
+.env.*
+!.env.example

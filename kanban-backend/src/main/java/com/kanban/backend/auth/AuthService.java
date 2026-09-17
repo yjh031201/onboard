@@ -20,15 +20,18 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenStore refreshTokenStore;
 
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtTokenProvider jwtTokenProvider
+            JwtTokenProvider jwtTokenProvider,
+            RefreshTokenStore refreshTokenStore
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.refreshTokenStore = refreshTokenStore;
     }
 
     @Transactional
@@ -55,8 +58,31 @@ public class AuthService {
         return issueToken(user);
     }
 
+    /** Access token이 만료된 클라이언트가 refresh token으로 재로그인 없이 새 토큰을 받는다. */
+    @Transactional(readOnly = true)
+    public AuthResponse refresh(String refreshToken) {
+        Long userId = jwtTokenProvider.parseRefreshUserId(refreshToken)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "유효하지 않은 리프레시 토큰입니다."));
+
+        if (!refreshTokenStore.isValid(userId, refreshToken)) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "만료되었거나 무효화된 리프레시 토큰입니다.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
+
+        return issueToken(user);
+    }
+
+    /** 로그아웃 시 Redis에 저장된 refresh token을 지워서 즉시 무효화한다. */
+    public void logout(Long userId) {
+        refreshTokenStore.invalidate(userId);
+    }
+
     private AuthResponse issueToken(User user) {
-        String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
-        return AuthResponse.of(token, jwtTokenProvider.getExpirationMs(), UserResponse.from(user));
+        String accessToken = jwtTokenProvider.createToken(user.getId(), user.getEmail());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getEmail());
+        refreshTokenStore.save(user.getId(), refreshToken, jwtTokenProvider.getRefreshExpirationMs());
+        return AuthResponse.of(accessToken, refreshToken, jwtTokenProvider.getExpirationMs(), UserResponse.from(user));
     }
 }
