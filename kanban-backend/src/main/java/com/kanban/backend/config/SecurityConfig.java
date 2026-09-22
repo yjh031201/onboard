@@ -38,6 +38,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // signup/login만 인증 없이 허용. /api/auth/me 등 나머지는 토큰 필요.
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
+                        // WebSocket(STOMP) 핸드셰이크는 여기서 열어두고, 실제 인증은
+                        // StompAuthChannelInterceptor가 CONNECT 프레임의 JWT로 처리한다.
+                        .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
