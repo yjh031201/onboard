@@ -12,7 +12,7 @@ export interface NavItem {
   icon: string;
 }
 
-export type PresenceStatus = "online" | "away" | "offline";
+export type PresenceStatus = "online" | "offline";
 
 export interface TeamMember {
   id: string;
@@ -21,16 +21,30 @@ export interface TeamMember {
   status: PresenceStatus;
 }
 
+/** Matches the backend's CardStatus enum (com.kanban.backend.board.CardStatus). */
+export type CardStatus = "TODO" | "IN_PROGRESS" | "DONE";
+
 export interface TaskCard {
   id: string;
   title: string;
-  tagColor: string;
+  status: CardStatus;
+  createdByName: string;
+  createdAt: string;
 }
 
 export interface KanbanColumn {
-  id: string;
+  id: CardStatus;
   title: string;
   tasks: TaskCard[];
+}
+
+export interface TimelineEventDto {
+  id: number;
+  type: "CARD_CREATED" | "CARD_MOVED";
+  message: string;
+  actorName: string;
+  notified: boolean;
+  createdAt: string;
 }
 
 export interface ProgressCardData {
