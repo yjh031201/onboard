@@ -10,7 +10,7 @@ services:
       MYSQL_PASSWORD: kanban1234
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - kanban-mysql-data:/var/lib/mysql
     healthcheck:

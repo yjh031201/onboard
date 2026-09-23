@@ -1,32 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PageShell from "../../components/layout/PageShell";
 import Section, { Divider } from "../../components/ui/Section";
 import { Field } from "../../components/ui/Field";
 import Button from "../../components/ui/Button";
 import Avatar from "../../components/ui/Avatar";
 import Pill from "../../components/ui/Pill";
+import { ApiError } from "../../lib/api";
+import { listMembers } from "../../lib/user";
+import { getStoredUser, type AuthUser } from "../../lib/auth";
+import InvitePopup from "../../components/members/InvitePopup";
+import RolePopup from "../../components/members/RolePopup";
+import { roleLabel } from "../../components/members/RoleCheckboxes";
 
-type Role = "소유자" | "관리자" | "멤버";
-
-interface TeamMemberRow {
-  id: string;
-  name: string;
-  email: string;
-  initial: string;
-  role: Role;
-}
-
-const MEMBERS: TeamMemberRow[] = [
-  { id: "1", name: "양종호", email: "jdbdjhd8q@gmail.com", initial: "양", role: "소유자" },
-  { id: "2", name: "김민수", email: "minsu@example.com", initial: "김", role: "관리자" },
-  { id: "3", name: "이서연", email: "seoyeon@example.com", initial: "이", role: "멤버" },
-  { id: "4", name: "박지훈", email: "jihoon@example.com", initial: "박", role: "멤버" },
-];
-
-const ROLE_PILL: Record<Role, { bg: string; text: string }> = {
-  소유자: { bg: "#eeeefe", text: "#6366f1" },
-  관리자: { bg: "#ecf2fe", text: "#2f60e0" },
-  멤버: { bg: "#f3f4f6", text: "#6b7280" },
+const ROLE_PILL: Record<string, { bg: string; text: string }> = {
+  OWNER: { bg: "#eeeefe", text: "#6366f1" },
+  ADMIN: { bg: "#ecf2fe", text: "#2f60e0" },
+  MEMBER: { bg: "#f3f4f6", text: "#6b7280" },
 };
 
 interface IntegrationRow {
@@ -49,6 +38,36 @@ const INTEGRATIONS: IntegrationRow[] = [
 
 export default function MembersPage() {
   const [teamName, setTeamName] = useState("칸반보드 프로젝트팀");
+  const currentUser = getStoredUser();
+
+  const [members, setMembers] = useState<AuthUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    listMembers()
+      .then(setMembers)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "팀원 목록을 불러오지 못했어요."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // OWNER/ADMIN만 구성원을 초대하거나 권한을 바꿀 수 있음 (서버에서도 동일하게 검증됨).
+  const canManageRoles = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+
+  const handleMemberUpdated = (updated: AuthUser) => {
+    setMembers((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  };
+
+  const handleMemberAdded = (added: AuthUser) => {
+    setMembers((prev) => {
+      const exists = prev.some((m) => m.id === added.id);
+      return exists ? prev.map((m) => (m.id === added.id ? added : m)) : [...prev, added];
+    });
+  };
 
   return (
     <PageShell title="팀원" subtitle="팀원을 초대하고 팀 정보를 관리하세요">
@@ -59,35 +78,54 @@ export default function MembersPage() {
         </div>
       </Section>
 
-      <Section title="구성원 및 권한" description="팀원을 초대하고 권한을 관리하세요">
+      <Section title="구성원 및 권한" description="이메일 또는 휴대폰번호로 팀원을 검색해서 추가하고 권한을 관리하세요">
         <div className="flex w-full items-center justify-between">
-          <p className="text-[12.5px] font-medium text-[#6b7280]">총 {MEMBERS.length}명</p>
-          <Button variant="primary">+ 구성원 초대</Button>
+          <p className="text-[12.5px] font-medium text-[#6b7280]">총 {members.length}명</p>
+          {canManageRoles && (
+            <Button variant="primary" onClick={() => setInviteOpen(true)}>
+              + 구성원 초대
+            </Button>
+          )}
         </div>
-        {MEMBERS.map((member, i) => (
-          <div key={member.id} className="flex w-full flex-col gap-[18px]">
-            {i > 0 && <Divider />}
-            <div className="flex w-full items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Avatar initial={member.initial} />
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-[13.5px] font-medium text-[#111827]">{member.name}</p>
-                  <p className="text-[12px] text-[#6b7280]">{member.email}</p>
+
+        {loading && <p className="text-[13px] text-[#9ca3af]">불러오는 중...</p>}
+
+        {error && (
+          <div className="w-full rounded-[10px] bg-[#fef2f2] px-4 py-3">
+            <p className="text-[13px] text-[#ef4444]">{error}</p>
+          </div>
+        )}
+
+        {!loading &&
+          !error &&
+          members.map((member, i) => (
+            <div key={member.id} className="flex w-full flex-col gap-[18px]">
+              {i > 0 && <Divider />}
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Avatar initial={member.name.slice(0, 1)} />
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-[13.5px] font-medium text-[#111827]">{member.name}</p>
+                    <p className="text-[12px] text-[#6b7280]">{member.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3.5">
+                  <Pill bg={ROLE_PILL[member.role]?.bg ?? "#f3f4f6"} text={ROLE_PILL[member.role]?.text ?? "#6b7280"}>
+                    {roleLabel(member.role)}
+                  </Pill>
+                  {canManageRoles && member.id !== currentUser?.id && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingMember(member)}
+                      className="text-[12.5px] text-[#6366f1]"
+                    >
+                      권한 변경
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-3.5">
-                <Pill bg={ROLE_PILL[member.role].bg} text={ROLE_PILL[member.role].text}>
-                  {member.role}
-                </Pill>
-                {member.role !== "소유자" && (
-                  <button type="button" className="text-[12.5px] text-[#9ca3af]">
-                    제거
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </Section>
 
       <Section title="연동" description="외부 서비스와 연결해 팀 작업을 더 편리하게 만드세요">
@@ -121,6 +159,12 @@ export default function MembersPage() {
       <Section title="팀 삭제" description="팀과 관련된 모든 데이터가 영구적으로 삭제되며 이 작업은 되돌릴 수 없습니다." danger>
         <Button variant="danger">팀 삭제</Button>
       </Section>
+
+      {inviteOpen && <InvitePopup onClose={() => setInviteOpen(false)} onAdded={handleMemberAdded} />}
+
+      {editingMember && (
+        <RolePopup member={editingMember} onClose={() => setEditingMember(null)} onUpdated={handleMemberUpdated} />
+      )}
     </PageShell>
   );
 }

@@ -1,7 +1,10 @@
 package com.kanban.backend.auth;
 
 import com.kanban.backend.auth.dto.AuthResponse;
+import com.kanban.backend.auth.dto.FindIdRequest;
+import com.kanban.backend.auth.dto.FindIdResponse;
 import com.kanban.backend.auth.dto.LoginRequest;
+import com.kanban.backend.auth.dto.ResetPasswordRequest;
 import com.kanban.backend.auth.dto.SignupRequest;
 import com.kanban.backend.auth.dto.UserResponse;
 import com.kanban.backend.user.User;
@@ -39,5 +42,16 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(UserResponse.from(user));
+    }
+
+    @PostMapping("/find-id")
+    public ResponseEntity<FindIdResponse> findId(@Valid @RequestBody FindIdRequest request) {
+        return ResponseEntity.ok(authService.findId(request));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.noContent().build();
     }
 }
