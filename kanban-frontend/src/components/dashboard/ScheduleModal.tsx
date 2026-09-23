@@ -7,6 +7,7 @@ import {
   SCHEDULE_COLORS,
   createSchedule,
   deleteSchedule,
+  toIsoDate,
   updateSchedule,
   type Schedule,
   type ScheduleCategoryCode,
@@ -15,26 +16,13 @@ import type { ScheduleDate } from "../../types/dashboard";
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as ScheduleCategoryCode[];
 
-const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-
-function formatDate(date: ScheduleDate): string {
-  const d = new Date(date.year, date.monthIndex, date.date);
-  const weekday = WEEKDAY_LABELS[d.getDay()];
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${weekday})`;
-}
-
-function toIsoDate(date: ScheduleDate): string {
-  const mm = String(date.monthIndex + 1).padStart(2, "0");
-  const dd = String(date.date).padStart(2, "0");
-  return `${date.year}-${mm}-${dd}`;
-}
-
 /** 서버는 HH:mm:ss로 내려줌 — <input type="time">은 HH:mm만 받음. */
 function toTimeInput(time: string | null): string {
   return time ? time.slice(0, 5) : "";
 }
 
 interface ScheduleModalProps {
+  /** 새 일정 추가 시 시작일/종료일 기본값 (캘린더에서 선택한 날짜). */
   date: ScheduleDate;
   /** 있으면 수정 모드, 없으면 새 일정 추가. */
   schedule?: Schedule;
@@ -56,6 +44,9 @@ export default function ScheduleModal({
   const isEdit = !!schedule;
   const [title, setTitle] = useState(schedule?.title ?? "");
   const [category, setCategory] = useState<ScheduleCategoryCode>(schedule?.category ?? "MEETING");
+  const defaultDate = toIsoDate(date.year, date.monthIndex, date.date);
+  const [startDate, setStartDate] = useState(schedule?.startDate ?? defaultDate);
+  const [endDate, setEndDate] = useState(schedule?.endDate ?? defaultDate);
   const [startTime, setStartTime] = useState(toTimeInput(schedule?.startTime ?? null));
   const [endTime, setEndTime] = useState(toTimeInput(schedule?.endTime ?? null));
   const [description, setDescription] = useState(schedule?.content ?? "");
@@ -68,7 +59,16 @@ export default function ScheduleModal({
       setError("제목을 입력해주세요.");
       return;
     }
-    if (startTime && endTime && endTime < startTime) {
+    if (!startDate || !endDate) {
+      setError("시작일과 종료일을 입력해주세요.");
+      return;
+    }
+    if (endDate < startDate) {
+      setError("종료일은 시작일보다 빠를 수 없어요.");
+      return;
+    }
+    // 시작 시간은 시작일, 종료 시간은 종료일 기준이라 하루짜리 일정일 때만 비교
+    if (startDate === endDate && startTime && endTime && endTime < startTime) {
       setError("종료 시간은 시작 시간보다 빠를 수 없어요.");
       return;
     }
@@ -77,7 +77,8 @@ export default function ScheduleModal({
       title: title.trim(),
       content: description,
       category,
-      scheduleDate: schedule?.scheduleDate ?? toIsoDate(date),
+      startDate,
+      endDate,
       startTime: startTime || null,
       endTime: endTime || null,
       color,
@@ -111,6 +112,12 @@ export default function ScheduleModal({
 
   const readOnly = isEdit && !canEdit;
 
+  // 시작일을 종료일 뒤로 옮기면 종료일도 같이 따라가게 (하루짜리 일정 기본)
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    if (value && endDate < value) setEndDate(value);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
@@ -134,9 +141,24 @@ export default function ScheduleModal({
           </button>
         </div>
 
-        <div className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#eeeefe] px-3 py-1.5">
-          <span className="text-[12px]">📅</span>
-          <span className="text-[12.5px] font-medium text-[#6366f1]">{formatDate(date)}</span>
+        <div className="flex w-full gap-3.5">
+          <Field
+            label="시작일"
+            type="date"
+            required
+            disabled={readOnly}
+            value={startDate}
+            onChange={(e) => handleStartDateChange(e.target.value)}
+          />
+          <Field
+            label="종료일"
+            type="date"
+            required
+            min={startDate}
+            disabled={readOnly}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
         </div>
 
         <Field
