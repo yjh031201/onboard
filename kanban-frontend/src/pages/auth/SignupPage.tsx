@@ -9,6 +9,7 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
@@ -30,7 +31,7 @@ export default function SignupPage() {
 
     setSubmitting(true);
     try {
-      await signup(name, email, password);
+      await signup(name, email, password, phone);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "회원가입에 실패했어요. 잠시 후 다시 시도해주세요.");
@@ -55,6 +56,14 @@ export default function SignupPage() {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <Field
+          label="휴대폰 번호"
+          type="tel"
+          placeholder="010-0000-0000"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           required
         />
         <Field

@@ -3,14 +3,36 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthCard from "../../components/auth/AuthCard";
 import { Field } from "../../components/ui/Field";
 import Button from "../../components/ui/Button";
-import { ApiError, login } from "../../lib/auth";
+import { ApiError, login, loginWithProvider } from "../../lib/auth";
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" />
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" />
+    </svg>
+  );
+}
+
+function NaverIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#fff" d="M11.4 9.6 6.6 3H3v12h3.6V8.4l4.8 6.6H15V3h-3.6z" />
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 소셜 로그인 실패 시 백엔드가 /login?oauthError=... 로 돌려보낸 메시지를 초기값으로 표시.
+  const [error, setError] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("oauthError"),
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -78,6 +100,31 @@ export default function LoginPage() {
           {submitting ? "로그인 중..." : "로그인"}
         </Button>
       </form>
+
+      <div className="flex w-full items-center gap-3">
+        <div className="h-px flex-1 bg-[#e5e7eb]" />
+        <span className="text-[12px] text-[#9ca3af]">또는</span>
+        <div className="h-px flex-1 bg-[#e5e7eb]" />
+      </div>
+
+      <div className="flex w-full flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={() => loginWithProvider("google")}
+          className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#e5e7eb] bg-white py-[13px] text-[14px] font-medium text-[#111827] transition-colors hover:bg-[#f9fafb]"
+        >
+          <GoogleIcon />
+          Google로 계속하기
+        </button>
+        <button
+          type="button"
+          onClick={() => loginWithProvider("naver")}
+          className="flex w-full items-center justify-center gap-2.5 rounded-lg bg-[#03c75a] py-[13px] text-[14px] font-bold text-white transition-colors hover:bg-[#02b350]"
+        >
+          <NaverIcon />
+          네이버로 계속하기
+        </button>
+      </div>
 
       <div className="flex w-full items-start justify-center gap-1.5 text-[12.5px]">
         <Link to="/find-id" className="text-[#6b7280]">

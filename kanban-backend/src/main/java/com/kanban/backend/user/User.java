@@ -32,24 +32,69 @@ public class User {
     @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(nullable = false, length = 255)
+    // 소셜 로그인 전용 계정은 비밀번호가 없다.
+    @Column(length = 255)
     private String password;
 
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(nullable = false, unique = true, length = 20)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role = UserRole.MEMBER;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_id", length = 255)
+    private String providerId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public User(String email, String password, String name) {
+    public User(String email, String password, String name, String phone) {
         this.email = email;
         this.password = password;
         this.name = name;
+        this.phone = phone;
         this.role = UserRole.MEMBER;
+        this.provider = AuthProvider.LOCAL;
+    }
+
+    /** 구글/네이버 등 소셜 로그인으로 처음 가입하는 경우 — 비밀번호 없이 생성된다. */
+    public User(String email, String name, AuthProvider provider, String providerId) {
+        this.email = email;
+        this.password = null;
+        this.name = name;
+        this.role = UserRole.MEMBER;
+        this.provider = provider;
+        this.providerId = providerId;
+    }
+
+    /** 기존 이메일/비밀번호 계정에 소셜 로그인 수단을 연결(link)할 때 사용. */
+    public void linkProvider(AuthProvider provider, String providerId) {
+        this.provider = provider;
+        this.providerId = providerId;
+    }
+
+    /** 비밀번호 재설정 전용 — 반드시 이미 인코딩된(BCrypt) 값을 넘길 것. */
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    /** 개인설정에서 이름/휴대폰번호 수정할 때 사용. */
+    public void changeProfile(String name, String phone) {
+        this.name = name;
+        this.phone = phone;
+    }
+
+    /** 팀원 권한 변경 시 사용 — OWNER/ADMIN만 호출 가능하도록 UserService에서 제한. */
+    public void changeRole(UserRole role) {
+        this.role = role;
     }
 
     @jakarta.persistence.PrePersist
