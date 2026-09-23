@@ -6,6 +6,7 @@ import com.kanban.backend.schedule.dto.ScheduleResponse;
 import com.kanban.backend.schedule.dto.ScheduleUpdateRequest;
 import com.kanban.backend.user.User;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,14 +26,16 @@ public class ScheduleService {
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
 
-        return repository.findByScheduleDateBetweenOrderByScheduleDateAsc(start, end).stream()
+        return repository.findByScheduleDateBetweenOrderByScheduleDateAscStartTimeAsc(start, end).stream()
                 .map(ScheduleResponse::from)
                 .toList();
     }
 
     @Transactional
     public ScheduleResponse create(ScheduleCreateRequest request, User currentUser) {
-        Schedule schedule = new Schedule(request.title(), request.content(), request.scheduleDate(), currentUser.getId());
+        requireValidTimeRange(request.startTime(), request.endTime());
+        Schedule schedule = new Schedule(request.title(), request.content(), request.category(),
+                request.scheduleDate(), request.startTime(), request.endTime(), request.color(), currentUser.getId());
         return ScheduleResponse.from(repository.save(schedule));
     }
 
@@ -40,7 +43,9 @@ public class ScheduleService {
     public ScheduleResponse update(Long id, ScheduleUpdateRequest request, User currentUser) {
         Schedule schedule = getOrThrow(id);
         requireEditable(schedule, currentUser);
-        schedule.update(request.title(), request.content(), request.scheduleDate());
+        requireValidTimeRange(request.startTime(), request.endTime());
+        schedule.update(request.title(), request.content(), request.category(),
+                request.scheduleDate(), request.startTime(), request.endTime(), request.color());
         return ScheduleResponse.from(schedule);
     }
 
@@ -54,6 +59,12 @@ public class ScheduleService {
     private Schedule getOrThrow(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다."));
+    }
+
+    private void requireValidTimeRange(LocalTime startTime, LocalTime endTime) {
+        if (startTime != null && endTime != null && endTime.isBefore(startTime)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "종료 시간은 시작 시간보다 빠를 수 없습니다.");
+        }
     }
 
     private void requireEditable(Schedule schedule, User user) {

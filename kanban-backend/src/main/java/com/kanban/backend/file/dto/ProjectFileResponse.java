@@ -9,15 +9,18 @@ public record ProjectFileResponse(
         long fileSize,
         String contentType,
         Long uploadedBy,
+        String uploaderName,
         LocalDateTime createdAt
 ) {
-    public static ProjectFileResponse from(ProjectFile file) {
+    /** uploaderName은 탈퇴 등으로 사용자를 못 찾으면 null. */
+    public static ProjectFileResponse from(ProjectFile file, String uploaderName) {
         return new ProjectFileResponse(
                 file.getId(),
                 file.getFileName(),
                 file.getFileSize(),
                 file.getContentType(),
                 file.getUploadedBy(),
+                uploaderName,
                 file.getCreatedAt()
         );
     }
