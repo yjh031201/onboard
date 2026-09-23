@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
-    List<Schedule> findByScheduleDateBetweenOrderByScheduleDateAsc(LocalDate start, LocalDate end);
+    List<Schedule> findByScheduleDateBetweenOrderByScheduleDateAscStartTimeAsc(LocalDate start, LocalDate end);
 }

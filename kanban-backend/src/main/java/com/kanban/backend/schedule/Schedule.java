@@ -4,6 +4,8 @@ import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -13,6 +15,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,8 +36,21 @@ public class Schedule {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ScheduleCategory category;
+
     @Column(name = "schedule_date", nullable = false)
     private LocalDate scheduleDate;
+
+    @Column(name = "start_time")
+    private LocalTime startTime;
+
+    @Column(name = "end_time")
+    private LocalTime endTime;
+
+    @Column(length = 7)
+    private String color;
 
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
@@ -45,17 +61,21 @@ public class Schedule {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Schedule(String title, String content, LocalDate scheduleDate, Long createdBy) {
-        this.title = title;
-        this.content = content;
-        this.scheduleDate = scheduleDate;
+    public Schedule(String title, String content, ScheduleCategory category, LocalDate scheduleDate,
+                    LocalTime startTime, LocalTime endTime, String color, Long createdBy) {
         this.createdBy = createdBy;
+        update(title, content, category, scheduleDate, startTime, endTime, color);
     }
 
-    public void update(String title, String content, LocalDate scheduleDate) {
+    public void update(String title, String content, ScheduleCategory category, LocalDate scheduleDate,
+                       LocalTime startTime, LocalTime endTime, String color) {
         this.title = title;
         this.content = content;
+        this.category = category;
         this.scheduleDate = scheduleDate;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.color = color;
     }
 
     /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정/삭제 가능. */

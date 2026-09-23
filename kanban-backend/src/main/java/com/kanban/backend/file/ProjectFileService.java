@@ -3,8 +3,12 @@ package com.kanban.backend.file;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.file.dto.ProjectFileResponse;
 import com.kanban.backend.user.User;
+import com.kanban.backend.user.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,16 +20,29 @@ public class ProjectFileService {
 
     private final ProjectFileRepository repository;
     private final FileStorageService fileStorageService;
+    private final UserRepository userRepository;
 
-    public ProjectFileService(ProjectFileRepository repository, FileStorageService fileStorageService) {
+    public ProjectFileService(
+            ProjectFileRepository repository,
+            FileStorageService fileStorageService,
+            UserRepository userRepository
+    ) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
     public List<ProjectFileResponse> list() {
-        return repository.findAllByOrderByCreatedAtDesc().stream()
-                .map(ProjectFileResponse::from)
+        List<ProjectFile> files = repository.findAllByOrderByCreatedAtDesc();
+
+        // 업로더 이름은 한 번에 조회해서 N+1 쿼리를 피한다.
+        Set<Long> uploaderIds = files.stream().map(ProjectFile::getUploadedBy).collect(Collectors.toSet());
+        Map<Long, String> names = userRepository.findAllById(uploaderIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getName));
+
+        return files.stream()
+                .map(file -> ProjectFileResponse.from(file, names.get(file.getUploadedBy())))
                 .toList();
     }
 
@@ -41,7 +58,7 @@ public class ProjectFileService {
         ProjectFile projectFile = new ProjectFile(
                 originalName, stored.fileKey(), stored.size(), stored.contentType(), currentUser.getId());
 
-        return ProjectFileResponse.from(repository.save(projectFile));
+        return ProjectFileResponse.from(repository.save(projectFile), currentUser.getName());
     }
 
     @Transactional(readOnly = true)

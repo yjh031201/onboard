@@ -104,15 +104,14 @@ npm run dev
 - **내 정보 조회**: `GET /api/auth/me` (토큰 필요)
 - 로그인 상태면 화면 우측 상단에 이름/아바타 표시(클릭 시 로그아웃), 비로그인 상태면 로그인 버튼 표시
 - **Refresh Token**: `/api/auth/refresh`, `/api/auth/logout` — Redis에 저장, 로그아웃 시 즉시 무효화 (백엔드 API만 있음, 프론트 연동 전)
-- **프로젝트 설정 API**: `GET/PUT /api/settings` (수정은 OWNER/ADMIN만, 백엔드만)
-- **일정(캘린더) API**: `GET/POST/PUT/DELETE /api/schedules` (수정/삭제는 작성자 본인 또는 OWNER/ADMIN만, 백엔드만)
-- **파일 업로드 API**: `GET/POST/DELETE /api/files`, `GET /api/files/{id}/download` — 로컬 디스크 저장 (백엔드만)
+- **프로젝트 설정**: `GET/PUT /api/settings` — 설정 페이지 "일반"(프로젝트 이름/설명) 연동됨. 수정은 OWNER/ADMIN만
+- **일정(캘린더)**: `GET/POST/PUT/DELETE /api/schedules` — 대시보드 캘린더 연동됨 (카테고리/시간/색상 포함). 수정/삭제는 작성자 본인 또는 OWNER/ADMIN만
+- **파일**: `GET/POST/DELETE /api/files`, `GET /api/files/{id}/download` — 파일 페이지 연동됨 (드래그 앤 드롭, 파일당 최대 50MB, 로컬 디스크 저장)
 - **구글 / 네이버 로그인**: `/oauth2/authorization/google`, `/oauth2/authorization/naver` — 프론트 로그인 페이지 버튼까지 연동됨 (설정 방법은 아래 참고)
 
 **아직 미구현:**
 - 아이디 찾기 / 비밀번호 찾기 — 화면(UI)만 있고 백엔드 API 없음
 - 칸반보드 카드 CRUD, 실시간 동기화 등 — 프론트 화면만 있고 백엔드 연동 전
-- 위 설정/일정/파일 API들의 프론트엔드 화면 연동
 - 파일 업로드 S3 저장 (`FileStorageService` 인터페이스만 있고 구현체는 로컬 전용)
 
 ## 구글 / 네이버 로그인 설정
