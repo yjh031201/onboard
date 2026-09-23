@@ -16,7 +16,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
  */
 @Configuration
 @Profile("!test")
-public class RedisConfig {
+public class RealtimeRedisConfig {
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
