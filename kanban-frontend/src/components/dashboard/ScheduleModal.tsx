@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Field, TextareaField } from "../ui/Field";
 import Button from "../ui/Button";
 import { ApiError } from "../../lib/api";
@@ -13,6 +13,7 @@ import {
   type ScheduleCategoryCode,
 } from "../../lib/schedules";
 import type { ScheduleDate } from "../../types/dashboard";
+import { formatTimeText, parseTimeText } from "../../utils/timeText";
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as ScheduleCategoryCode[];
 
@@ -48,8 +49,11 @@ export default function ScheduleModal({
   const [startDate, setStartDate] = useState(schedule?.startDate ?? defaultDate);
   const [endDate, setEndDate] = useState(schedule?.endDate ?? defaultDate);
   const [startTime, setStartTime] = useState(toTimeInput(schedule?.startTime ?? null));
-  const [endTime, setEndTime] = useState(toTimeInput(schedule?.endTime ?? null));
+  // 왼쪽 "시간" 칸에 직접 쓰는 글자 ("오후 7시" 등). 해석되면 오른쪽 시작 시간이 따라 바뀐다.
+  const [timeText, setTimeText] = useState(startTime ? formatTimeText(startTime) : "");
   const [description, setDescription] = useState(schedule?.content ?? "");
+  // 설명에서 마지막으로 읽어낸 시각 — 설명 속 시각이 바뀔 때만 시작 시간을 덮어쓰기 위함
+  const lastDescriptionTime = useRef(parseTimeText(schedule?.content ?? ""));
   const [color, setColor] = useState(schedule?.color ?? SCHEDULE_COLORS[0]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,11 +71,6 @@ export default function ScheduleModal({
       setError("종료일은 시작일보다 빠를 수 없어요.");
       return;
     }
-    // 시작 시간은 시작일, 종료 시간은 종료일 기준이라 하루짜리 일정일 때만 비교
-    if (startDate === endDate && startTime && endTime && endTime < startTime) {
-      setError("종료 시간은 시작 시간보다 빠를 수 없어요.");
-      return;
-    }
 
     const input = {
       title: title.trim(),
@@ -80,7 +79,7 @@ export default function ScheduleModal({
       startDate,
       endDate,
       startTime: startTime || null,
-      endTime: endTime || null,
+      endTime: null,
       color,
     };
 
@@ -113,6 +112,26 @@ export default function ScheduleModal({
   const readOnly = isEdit && !canEdit;
 
   // 시작일을 종료일 뒤로 옮기면 종료일도 같이 따라가게 (하루짜리 일정 기본)
+  const handleTimeTextChange = (value: string) => {
+    setTimeText(value);
+    const parsed = parseTimeText(value);
+    if (parsed) setStartTime(parsed);
+  };
+
+  const handleStartTimeChange = (value: string) => {
+    setStartTime(value);
+    setTimeText(value ? formatTimeText(value) : "");
+  };
+
+  const handleDescriptionChange = (value: string) => {
+    setDescription(value);
+    const parsed = parseTimeText(value);
+    if (parsed && parsed !== lastDescriptionTime.current) {
+      handleStartTimeChange(parsed);
+    }
+    lastDescriptionTime.current = parsed;
+  };
+
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
     if (value && endDate < value) setEndDate(value);
@@ -189,21 +208,28 @@ export default function ScheduleModal({
           </div>
         </div>
 
-        <div className="flex w-full gap-3.5">
-          <Field
-            label="시작 시간"
-            type="time"
-            disabled={readOnly}
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-          <Field
-            label="종료 시간"
-            type="time"
-            disabled={readOnly}
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
+        <div className="flex w-full flex-col gap-1.5">
+          <div className="flex w-full gap-3.5">
+            <Field
+              label="시간"
+              placeholder="예: 오후 7시, 7시 반"
+              disabled={readOnly}
+              value={timeText}
+              onChange={(e) => handleTimeTextChange(e.target.value)}
+            />
+            <Field
+              label="시작 시간"
+              type="time"
+              disabled={readOnly}
+              value={startTime}
+              onChange={(e) => handleStartTimeChange(e.target.value)}
+            />
+          </div>
+          {!readOnly && (
+            <p className="text-[12px] text-[#9ca3af]">
+              오전/오후 없이 "7시"라고 쓰면 오후로 들어가요. 설명에 쓴 시간도 자동으로 반영돼요.
+            </p>
+          )}
         </div>
 
         <TextareaField
@@ -213,7 +239,7 @@ export default function ScheduleModal({
           maxLength={5000}
           disabled={readOnly}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
         />
 
         <div className="flex w-full flex-col gap-2">
