@@ -63,6 +63,10 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+realtime:
+  # 프론트엔드 dev 서버 origin — STOMP 핸드셰이크(SockJS)용. SecurityConfig의 CORS 설정과 맞춰서 관리.
+  allowed-origin: ${REALTIME_ALLOWED_ORIGIN:http://localhost:5173}
+
 jwt:
   # 로컬 개발용 기본값 — 운영 배포 전에는 반드시 환경변수로 교체할 것.
   secret: ${JWT_SECRET:local-dev-secret-key-change-me-before-deploy-please-32bytes+}

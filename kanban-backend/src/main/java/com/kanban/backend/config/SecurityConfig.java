@@ -61,9 +61,12 @@ public class SecurityConfig {
                         "/api/auth/reset-password",
                         "/api/auth/refresh",
                         "/api/auth/oauth/exchange"
-                ).permitAll()
-                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                                        .anyRequest().authenticated()
+                        ).permitAll()
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        // WebSocket(STOMP) 핸드셰이크는 여기서 열어두고, 실제 인증은
+                        // StompAuthChannelInterceptor가 CONNECT 프레임의 JWT로 처리한다.
+                        .requestMatchers("/ws/**").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
