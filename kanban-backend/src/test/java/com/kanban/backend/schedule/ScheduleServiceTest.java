@@ -44,24 +44,26 @@ class ScheduleServiceTest {
     }
 
     private Schedule scheduleOwnedBy(long ownerId) {
-        Schedule schedule = new Schedule("회의", null, ScheduleCategory.MEETING, DATE,
+        Schedule schedule = new Schedule("회의", null, ScheduleCategory.MEETING, DATE, DATE,
                 LocalTime.of(10, 0), LocalTime.of(11, 0), "#6366f1", ownerId);
         ReflectionTestUtils.setField(schedule, "id", 1L);
         return schedule;
     }
 
     private ScheduleUpdateRequest updateRequest() {
-        return new ScheduleUpdateRequest("마감", "내용", ScheduleCategory.DEADLINE, DATE, null, null, "#10b981");
+        return new ScheduleUpdateRequest("마감", "내용", ScheduleCategory.DEADLINE, DATE, DATE, null, null, "#10b981");
     }
 
     @Test
-    void create_savesCategoryTimeAndColor() {
-        var request = new ScheduleCreateRequest("회의", null, ScheduleCategory.MEETING, DATE,
+    void create_savesPeriodCategoryTimeAndColor() {
+        var request = new ScheduleCreateRequest("회의", null, ScheduleCategory.MEETING, DATE, DATE.plusDays(2),
                 LocalTime.of(10, 0), LocalTime.of(11, 30), "#f59e0b");
 
         var response = service.create(request, userWithId(1L, UserRole.MEMBER));
 
         assertThat(response.category()).isEqualTo(ScheduleCategory.MEETING);
+        assertThat(response.startDate()).isEqualTo(DATE);
+        assertThat(response.endDate()).isEqualTo(DATE.plusDays(2));
         assertThat(response.startTime()).isEqualTo(LocalTime.of(10, 0));
         assertThat(response.endTime()).isEqualTo(LocalTime.of(11, 30));
         assertThat(response.color()).isEqualTo("#f59e0b");
@@ -69,9 +71,30 @@ class ScheduleServiceTest {
     }
 
     @Test
-    void create_rejectsEndTimeBeforeStartTime() {
-        var request = new ScheduleCreateRequest("회의", null, ScheduleCategory.MEETING, DATE,
+    void create_rejectsEndTimeBeforeStartTimeOnSameDay() {
+        var request = new ScheduleCreateRequest("회의", null, ScheduleCategory.MEETING, DATE, DATE,
                 LocalTime.of(12, 0), LocalTime.of(9, 0), "#6366f1");
+
+        assertThatThrownBy(() -> service.create(request, userWithId(1L, UserRole.MEMBER)))
+                .isInstanceOf(ApiException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void create_allowsEarlierEndTimeWhenPeriodSpansDays() {
+        // 24일 18:00 ~ 25일 09:00 같은 기간 일정은 정상
+        var request = new ScheduleCreateRequest("워크숍", null, ScheduleCategory.EVENT, DATE, DATE.plusDays(1),
+                LocalTime.of(18, 0), LocalTime.of(9, 0), "#6366f1");
+
+        var response = service.create(request, userWithId(1L, UserRole.MEMBER));
+
+        assertThat(response.endDate()).isEqualTo(DATE.plusDays(1));
+    }
+
+    @Test
+    void create_rejectsEndDateBeforeStartDate() {
+        var request = new ScheduleCreateRequest("회의", null, ScheduleCategory.MEETING, DATE, DATE.minusDays(1),
+                null, null, "#6366f1");
 
         assertThatThrownBy(() -> service.create(request, userWithId(1L, UserRole.MEMBER)))
                 .isInstanceOf(ApiException.class);

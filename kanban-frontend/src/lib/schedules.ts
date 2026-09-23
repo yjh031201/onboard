@@ -21,9 +21,10 @@ export interface Schedule {
   title: string;
   content: string | null;
   category: ScheduleCategoryCode;
-  scheduleDate: string; // YYYY-MM-DD
-  startTime: string | null; // HH:mm:ss
-  endTime: string | null;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // 하루짜리 일정이면 startDate와 같음
+  startTime: string | null; // HH:mm:ss, 시작일 기준
+  endTime: string | null; // 종료일 기준
   color: string | null;
   createdBy: number;
   createdAt: string;
@@ -34,13 +35,21 @@ export interface ScheduleInput {
   title: string;
   content: string;
   category: ScheduleCategoryCode;
-  scheduleDate: string;
+  startDate: string;
+  endDate: string;
   startTime: string | null; // HH:mm
   endTime: string | null;
   color: string;
 }
 
-/** monthIndex는 JS Date와 같은 0-11, 서버는 1-12를 받음. */
+/** 서버와 주고받는 날짜 형식(YYYY-MM-DD). 문자열 비교로 날짜 앞뒤 비교가 가능하다. */
+export function toIsoDate(year: number, monthIndex: number, date: number): string {
+  const mm = String(monthIndex + 1).padStart(2, "0");
+  const dd = String(date).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
+}
+
+/** 해당 월과 하루라도 겹치는 일정 전부. monthIndex는 JS Date와 같은 0-11, 서버는 1-12를 받음. */
 export function listMonthSchedules(year: number, monthIndex: number): Promise<Schedule[]> {
   return apiRequest<Schedule[]>(`/api/schedules?year=${year}&month=${monthIndex + 1}`);
 }

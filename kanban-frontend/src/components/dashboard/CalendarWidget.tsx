@@ -7,27 +7,49 @@ import {
   CATEGORY_LABELS,
   SCHEDULE_COLORS,
   listMonthSchedules,
+  toIsoDate,
   type Schedule,
 } from "../../lib/schedules";
 import ScheduleModal from "./ScheduleModal";
+
+/** 한 날짜 칸에 점으로 보여줄 최대 일정 수 */
+const MAX_DOTS = 3;
 
 function todayDate(): ScheduleDate {
   const now = new Date();
   return { year: now.getFullYear(), monthIndex: now.getMonth(), date: now.getDate() };
 }
 
-/** "2026-09-24" → 24 (이미 해당 월만 조회하므로 일자만 필요) */
-function dayOfMonth(isoDate: string): number {
-  return Number(isoDate.slice(8, 10));
+function scheduleColor(schedule: Schedule): string {
+  return schedule.color ?? SCHEDULE_COLORS[0];
 }
 
-function formatTimeRange(schedule: Schedule): string {
+/** "2026-09-24" → "9/24" */
+function formatShortDate(isoDate: string): string {
+  return `${Number(isoDate.slice(5, 7))}/${Number(isoDate.slice(8, 10))}`;
+}
+
+function formatPeriod(schedule: Schedule): string {
   const start = schedule.startTime?.slice(0, 5);
   const end = schedule.endTime?.slice(0, 5);
+
+  if (schedule.startDate !== schedule.endDate) {
+    const from = [formatShortDate(schedule.startDate), start].filter(Boolean).join(" ");
+    const to = [formatShortDate(schedule.endDate), end].filter(Boolean).join(" ");
+    return `${from} ~ ${to}`;
+  }
   if (start && end) return `${start} - ${end}`;
   if (start) return start;
   if (end) return `~ ${end}`;
   return "하루 종일";
+}
+
+function sortByStart(a: Schedule, b: Schedule): number {
+  return (
+    a.startDate.localeCompare(b.startDate) ||
+    (a.startTime ?? "").localeCompare(b.startTime ?? "") ||
+    a.id - b.id
+  );
 }
 
 type ModalState = { mode: "add" } | { mode: "edit"; schedule: Schedule } | null;
@@ -61,16 +83,17 @@ export default function CalendarWidget() {
     };
   }, [viewYear, viewMonth]);
 
-  const weeks = useMemo(
-    () =>
-      buildMonthGrid(viewYear, viewMonth, {
-        eventDates: schedules.map((s) => dayOfMonth(s.scheduleDate)),
-        today,
-      }),
-    [viewYear, viewMonth, schedules, today],
-  );
+  const weeks = useMemo(() => buildMonthGrid(viewYear, viewMonth, { today }), [viewYear, viewMonth, today]);
 
-  const selectedSchedules = schedules.filter((s) => dayOfMonth(s.scheduleDate) === selectedDay);
+  const monthStart = toIsoDate(viewYear, viewMonth, 1);
+  const monthEnd = toIsoDate(viewYear, viewMonth, new Date(viewYear, viewMonth + 1, 0).getDate());
+
+  /** 해당 날짜가 기간 안에 들어가는 일정들 (시작일 순) */
+  const schedulesOn = (isoDate: string) =>
+    schedules.filter((s) => s.startDate <= isoDate && isoDate <= s.endDate);
+
+  const selectedIso = toIsoDate(viewYear, viewMonth, selectedDay);
+  const selectedSchedules = schedulesOn(selectedIso);
   const selectedDate: ScheduleDate = { year: viewYear, monthIndex: viewMonth, date: selectedDay };
 
   // 작성자 본인이거나 OWNER/ADMIN이면 수정/삭제 가능 (서버에서도 동일하게 검증됨).
@@ -91,11 +114,9 @@ export default function CalendarWidget() {
   const handleSaved = (saved: Schedule) => {
     setSchedules((prev) => {
       const others = prev.filter((s) => s.id !== saved.id);
-      return [...others, saved].sort(
-        (a, b) =>
-          a.scheduleDate.localeCompare(b.scheduleDate) ||
-          (a.startTime ?? "").localeCompare(b.startTime ?? ""),
-      );
+      // 기간을 다른 달로 옮겼으면 지금 보고 있는 달 목록에서는 빠진다.
+      const inView = saved.startDate <= monthEnd && saved.endDate >= monthStart;
+      return (inView ? [...others, saved] : others).sort(sortByStart);
     });
   };
 
@@ -141,7 +162,15 @@ export default function CalendarWidget() {
         {weeks.map((week, weekIdx) => (
           <div key={weekIdx} className="flex w-full items-start">
             {week.map((day, dayIdx) => {
+              const iso = day.inCurrentMonth ? toIsoDate(viewYear, viewMonth, day.date) : null;
+              const daySchedules = iso ? schedulesOn(iso) : [];
+              // 배경 띠는 가장 먼저 시작한 일정의 색으로, 기간이 이어지면 옆 칸과 붙어 보이게 한다.
+              const band = daySchedules[0];
+              const bandStartsHere = !!band && (band.startDate === iso || dayIdx === 0 || day.date === 1);
+              const bandEndsHere =
+                !!band && (band.endDate === iso || dayIdx === 6 || iso === monthEnd);
               const isSelected = day.inCurrentMonth && day.date === selectedDay;
+
               return (
                 <button
                   key={dayIdx}
@@ -152,28 +181,47 @@ export default function CalendarWidget() {
                     day.inCurrentMonth ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
-                  {day.isToday ? (
-                    <span className="flex size-[26px] items-center justify-center rounded-full bg-[#6366f1] text-[12px] font-bold text-white">
-                      {day.date}
-                    </span>
-                  ) : (
-                    <span
-                      className={`flex size-[26px] items-center justify-center rounded-full text-[12px] ${
-                        isSelected ? "bg-[#eeeefe] font-bold text-[#6366f1]" : ""
-                      } ${
-                        day.inCurrentMonth
-                          ? "font-medium text-[#111827]"
-                          : "font-normal text-[#d1d2d6]"
-                      }`}
-                    >
-                      {day.date}
-                    </span>
-                  )}
-                  <span
-                    className={`size-1 rounded-sm ${
-                      day.hasEvent ? "bg-[#6366f1]" : "bg-transparent"
-                    }`}
-                  />
+                  <span className="relative flex h-[26px] w-full items-center justify-center">
+                    {band && (
+                      <span
+                        aria-hidden
+                        className={`absolute inset-y-0 ${bandStartsHere ? "rounded-l-full" : ""} ${
+                          bandEndsHere ? "rounded-r-full" : ""
+                        }`}
+                        style={{
+                          left: bandStartsHere ? 2 : 0,
+                          right: bandEndsHere ? 2 : 0,
+                          backgroundColor: `${scheduleColor(band)}33`, // 색상 태그 20% 투명도
+                        }}
+                      />
+                    )}
+                    {day.isToday ? (
+                      <span className="relative flex size-[26px] items-center justify-center rounded-full bg-[#6366f1] text-[12px] font-bold text-white">
+                        {day.date}
+                      </span>
+                    ) : (
+                      <span
+                        className={`relative flex size-[26px] items-center justify-center rounded-full text-[12px] ${
+                          isSelected ? "font-bold text-[#6366f1] ring-2 ring-[#6366f1] ring-inset" : ""
+                        } ${
+                          day.inCurrentMonth
+                            ? "font-medium text-[#111827]"
+                            : "font-normal text-[#d1d2d6]"
+                        }`}
+                      >
+                        {day.date}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex h-1 items-center gap-0.5">
+                    {daySchedules.slice(0, MAX_DOTS).map((s) => (
+                      <span
+                        key={s.id}
+                        className="size-1 rounded-sm"
+                        style={{ backgroundColor: scheduleColor(s) }}
+                      />
+                    ))}
+                  </span>
                 </button>
               );
             })}
@@ -199,13 +247,13 @@ export default function CalendarWidget() {
             >
               <span
                 className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: schedule.color ?? SCHEDULE_COLORS[0] }}
+                style={{ backgroundColor: scheduleColor(schedule) }}
               />
               <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#111827]">
                 {schedule.title}
               </span>
               <span className="shrink-0 text-[11px] text-[#6b7280]">
-                {CATEGORY_LABELS[schedule.category]} · {formatTimeRange(schedule)}
+                {CATEGORY_LABELS[schedule.category]} · {formatPeriod(schedule)}
               </span>
             </button>
           ))

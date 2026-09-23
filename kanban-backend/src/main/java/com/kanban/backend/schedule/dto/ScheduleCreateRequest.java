@@ -12,7 +12,8 @@ public record ScheduleCreateRequest(
         @NotBlank @Size(max = 200) String title,
         @Size(max = 5000) String content,
         @NotNull ScheduleCategory category,
-        @NotNull LocalDate scheduleDate,
+        @NotNull LocalDate startDate,
+        @NotNull LocalDate endDate,
         LocalTime startTime,
         LocalTime endTime,
         @Pattern(regexp = "^#[0-9a-fA-F]{6}$", message = "색상은 #RRGGBB 형식이어야 합니다.") String color

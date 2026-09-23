@@ -21,7 +21,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "schedules", indexes = @Index(name = "idx_schedule_date", columnList = "schedule_date"))
+@Table(name = "schedules", indexes = @Index(name = "idx_schedule_date", columnList = "start_date"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Schedule {
@@ -40,8 +40,12 @@ public class Schedule {
     @Column(nullable = false, length = 20)
     private ScheduleCategory category;
 
-    @Column(name = "schedule_date", nullable = false)
-    private LocalDate scheduleDate;
+    @Column(name = "start_date", nullable = false)
+    private LocalDate startDate;
+
+    /** 하루짜리 일정이면 startDate와 같다. */
+    @Column(name = "end_date", nullable = false)
+    private LocalDate endDate;
 
     @Column(name = "start_time")
     private LocalTime startTime;
@@ -61,18 +65,19 @@ public class Schedule {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Schedule(String title, String content, ScheduleCategory category, LocalDate scheduleDate,
+    public Schedule(String title, String content, ScheduleCategory category, LocalDate startDate, LocalDate endDate,
                     LocalTime startTime, LocalTime endTime, String color, Long createdBy) {
         this.createdBy = createdBy;
-        update(title, content, category, scheduleDate, startTime, endTime, color);
+        update(title, content, category, startDate, endDate, startTime, endTime, color);
     }
 
-    public void update(String title, String content, ScheduleCategory category, LocalDate scheduleDate,
+    public void update(String title, String content, ScheduleCategory category, LocalDate startDate, LocalDate endDate,
                        LocalTime startTime, LocalTime endTime, String color) {
         this.title = title;
         this.content = content;
         this.category = category;
-        this.scheduleDate = scheduleDate;
+        this.startDate = startDate;
+        this.endDate = endDate;
         this.startTime = startTime;
         this.endTime = endTime;
         this.color = color;
