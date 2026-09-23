@@ -163,6 +163,9 @@ class AuthServiceTest {
                 authService.resetPassword(new ResetPasswordRequest("다른사람", user.getEmail(), "newPassword1")))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("일치하는 회원 정보");
+    }
+
+    @Test
     void login_rejectsSocialOnlyAccountWithoutPassword() {
         User user = new User("jdbdjhd8q@gmail.com", "양종호", AuthProvider.GOOGLE, "google-sub-1");
         ReflectionTestUtils.setField(user, "id", 1L);
@@ -174,7 +177,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_issuesNewTokenWhenStoredValueMatches() {
-        User user = new User("jdbdjhd8q@gmail.com", passwordEncoder.encode("password123"), "양종호");
+        User user = new User("jdbdjhd8q@gmail.com", passwordEncoder.encode("password123"), "양종호", "010-1234-5678");
         ReflectionTestUtils.setField(user, "id", 1L);
         when(jwtTokenProvider.parseRefreshUserId("valid-refresh-token")).thenReturn(Optional.of(1L));
         when(refreshTokenStore.isValid(1L, "valid-refresh-token")).thenReturn(true);

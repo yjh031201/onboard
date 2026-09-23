@@ -76,6 +76,8 @@ export function resetPassword(name: string, email: string, newPassword: string):
     method: "POST",
     body: JSON.stringify({ name, email, newPassword }),
   });
+}
+
 /** 구글/네이버 로그인 시작 — 전체 페이지 이동으로 백엔드 OAuth2 엔드포인트로 보낸다. */
 export function loginWithProvider(provider: "google" | "naver") {
   window.location.href = `${API_BASE_URL}/oauth2/authorization/${provider}`;
