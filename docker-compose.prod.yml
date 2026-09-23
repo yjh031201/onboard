@@ -1,4 +1,4 @@
-# 배포용 풀스택 compose. 로컬 개발은 지금처럼 kanban-backend/docker-compose.yml(DB만) +
+# 배포용 풀스택 compose. 로컬 개발은 지금처럼 kanban-backend/docker-compose.yml(DB + Redis만) +
 # mvnw + npm run dev 조합을 그대로 쓰면 됨 — 이 파일은 실제 배포/통합 테스트용.
 #
 # 사용법:

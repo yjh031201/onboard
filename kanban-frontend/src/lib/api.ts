@@ -2,7 +2,7 @@
 // 앞으로 칸반보드/팀/파일 등 새 기능을 만들 때는 이 파일의 apiRequest()를 사용하면
 // 로그인 토큰이 자동으로 실리고, 토큰이 만료됐을 때도 자동으로 처리돼요.
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 const TOKEN_KEY = "kanban_access_token";
 const USER_KEY = "kanban_user";

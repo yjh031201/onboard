@@ -68,7 +68,7 @@ docker compose up -d
 docker ps
 ```
 
-`kanban-mysql`이 `healthy` 상태로 떠 있어야 합니다. (`starting` 상태에서 바로 다음 단계로 넘어가면 DB 연결 실패로 실행이 죽습니다 — 몇 초 기다렸다가 다시 확인)
+`kanban-mysql`, `kanban-redis` 둘 다 `healthy` 상태로 떠 있어야 합니다. (`starting` 상태에서 바로 다음 단계로 넘어가면 DB/Redis 연결 실패로 실행이 죽습니다 — 몇 초 기다렸다가 다시 확인)
 
 ### 3. 백엔드 실행
 
@@ -137,7 +137,7 @@ NAVER_CLIENT_SECRET=...
 ```
 
 로그인 성공/실패 후에는 백엔드가 `FRONTEND_BASE_URL`(기본값 `http://localhost:5173`)로 리다이렉트합니다.
-프론트를 다른 포트로 띄웠다면 이 값도 같이 맞춰주고, `SecurityConfig`의 CORS 허용 목록에도 추가해야 합니다.
+프론트를 다른 포트로 띄웠다면 이 값도 같이 맞춰주고, `CORS_ALLOWED_ORIGINS` 환경변수(CORS 허용 목록)에도 추가해야 합니다.
 
 ## DB 접속 정보 (로컬 개발용)
 
@@ -192,6 +192,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 **`ports are not available: ... 3306 ...`**
 → 로컬에 이미 다른 MySQL이 3306 포트를 쓰고 있는 경우. 이 프로젝트는 호스트 포트를 3307로 분리해뒀으니 재발하면 `docker-compose.yml`의 포트 매핑 확인.
+
+**`ports are not available: ... 6379 ...`**
+→ 로컬에 이미 다른 Redis가 6379 포트를 쓰고 있는 경우. 기존 Redis를 끄거나, `docker-compose.yml`의 매핑을 `"6380:6379"`처럼 바꾸고 백엔드 실행 시 `REDIS_PORT=6380` 환경변수를 지정.
 
 **`release version 21 not supported`**
 → 컴파일에 쓰이는 Java가 21 미만. `java -version` 확인 후 JDK 21로 `JAVA_HOME` 설정.
