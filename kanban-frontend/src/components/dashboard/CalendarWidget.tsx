@@ -12,8 +12,32 @@ import {
 } from "../../lib/schedules";
 import ScheduleModal from "./ScheduleModal";
 
-/** 한 날짜 칸에 점으로 보여줄 최대 일정 수 */
-const MAX_DOTS = 3;
+/** 날짜 칸 아래에 막대로 보여줄 최대 줄 수 — 넘치는 일정은 "+N"으로 표시 */
+const MAX_LANES = 2;
+
+/**
+ * 겹치는 일정끼리 서로 다른 줄(lane)에 배치한다. 한 일정은 기간 내내 같은 줄을 쓰므로
+ * 막대가 날짜를 넘어 이어져 보인다. 먼저 시작한 일정, 같은 날 시작이면 긴 일정이 윗줄.
+ */
+function assignLanes(schedules: Schedule[], monthStart: string): Map<number, number> {
+  const effectiveStart = (s: Schedule) => (s.startDate < monthStart ? monthStart : s.startDate);
+  const sorted = [...schedules].sort(
+    (a, b) =>
+      effectiveStart(a).localeCompare(effectiveStart(b)) ||
+      b.endDate.localeCompare(a.endDate) ||
+      a.id - b.id,
+  );
+
+  const laneEnds: string[] = []; // 각 줄에 마지막으로 놓인 일정의 종료일
+  const lanes = new Map<number, number>();
+  for (const s of sorted) {
+    let lane = laneEnds.findIndex((end) => end < effectiveStart(s));
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = s.endDate;
+    lanes.set(s.id, lane);
+  }
+  return lanes;
+}
 
 function todayDate(): ScheduleDate {
   const now = new Date();
@@ -87,6 +111,8 @@ export default function CalendarWidget() {
 
   const monthStart = toIsoDate(viewYear, viewMonth, 1);
   const monthEnd = toIsoDate(viewYear, viewMonth, new Date(viewYear, viewMonth + 1, 0).getDate());
+
+  const lanes = useMemo(() => assignLanes(schedules, monthStart), [schedules, monthStart]);
 
   /** 해당 날짜가 기간 안에 들어가는 일정들 (시작일 순) */
   const schedulesOn = (isoDate: string) =>
@@ -164,11 +190,7 @@ export default function CalendarWidget() {
             {week.map((day, dayIdx) => {
               const iso = day.inCurrentMonth ? toIsoDate(viewYear, viewMonth, day.date) : null;
               const daySchedules = iso ? schedulesOn(iso) : [];
-              // 배경 띠는 가장 먼저 시작한 일정의 색으로, 기간이 이어지면 옆 칸과 붙어 보이게 한다.
-              const band = daySchedules[0];
-              const bandStartsHere = !!band && (band.startDate === iso || dayIdx === 0 || day.date === 1);
-              const bandEndsHere =
-                !!band && (band.endDate === iso || dayIdx === 6 || iso === monthEnd);
+              const hiddenCount = daySchedules.filter((s) => (lanes.get(s.id) ?? 0) >= MAX_LANES).length;
               const isSelected = day.inCurrentMonth && day.date === selectedDay;
 
               return (
@@ -181,47 +203,51 @@ export default function CalendarWidget() {
                     day.inCurrentMonth ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
-                  <span className="relative flex h-[26px] w-full items-center justify-center">
-                    {band && (
-                      <span
-                        aria-hidden
-                        className={`absolute inset-y-0 ${bandStartsHere ? "rounded-l-full" : ""} ${
-                          bandEndsHere ? "rounded-r-full" : ""
-                        }`}
-                        style={{
-                          left: bandStartsHere ? 2 : 0,
-                          right: bandEndsHere ? 2 : 0,
-                          backgroundColor: `${scheduleColor(band)}33`, // 색상 태그 20% 투명도
-                        }}
-                      />
-                    )}
-                    {day.isToday ? (
-                      <span className="relative flex size-[26px] items-center justify-center rounded-full bg-[#6366f1] text-[12px] font-bold text-white">
-                        {day.date}
-                      </span>
-                    ) : (
-                      <span
-                        className={`relative flex size-[26px] items-center justify-center rounded-full text-[12px] ${
-                          isSelected ? "font-bold text-[#6366f1] ring-2 ring-[#6366f1] ring-inset" : ""
-                        } ${
-                          day.inCurrentMonth
-                            ? "font-medium text-[#111827]"
-                            : "font-normal text-[#d1d2d6]"
-                        }`}
-                      >
-                        {day.date}
-                      </span>
-                    )}
+                  {day.isToday ? (
+                    <span className="flex size-[26px] items-center justify-center rounded-full bg-[#6366f1] text-[12px] font-bold text-white">
+                      {day.date}
+                    </span>
+                  ) : (
+                    <span
+                      className={`flex size-[26px] items-center justify-center rounded-full text-[12px] ${
+                        isSelected ? "bg-[#eeeefe] font-bold text-[#6366f1]" : ""
+                      } ${
+                        day.inCurrentMonth
+                          ? "font-medium text-[#111827]"
+                          : "font-normal text-[#d1d2d6]"
+                      }`}
+                    >
+                      {day.date}
+                    </span>
+                  )}
+                  <span className="flex w-full flex-col gap-[2px]">
+                    {Array.from({ length: MAX_LANES }, (_, lane) => {
+                      const s = daySchedules.find((item) => lanes.get(item.id) === lane);
+                      if (!s) return <span key={lane} className="h-1" />;
+                      // 기간의 처음/끝(또는 주·월 경계)에서만 둥글게, 중간은 옆 칸과 붙여서 이어진 막대로
+                      const startsHere = s.startDate === iso || dayIdx === 0 || day.date === 1;
+                      const endsHere = s.endDate === iso || dayIdx === 6 || iso === monthEnd;
+                      return (
+                        <span
+                          key={lane}
+                          title={s.title}
+                          className={`h-1 ${startsHere ? "rounded-l-full" : ""} ${
+                            endsHere ? "rounded-r-full" : ""
+                          }`}
+                          style={{
+                            marginLeft: startsHere ? 3 : 0,
+                            marginRight: endsHere ? 3 : 0,
+                            backgroundColor: scheduleColor(s),
+                          }}
+                        />
+                      );
+                    })}
                   </span>
-                  <span className="flex h-1 items-center gap-0.5">
-                    {daySchedules.slice(0, MAX_DOTS).map((s) => (
-                      <span
-                        key={s.id}
-                        className="size-1 rounded-sm"
-                        style={{ backgroundColor: scheduleColor(s) }}
-                      />
-                    ))}
-                  </span>
+                  {hiddenCount > 0 && (
+                    <span className="text-[9px] leading-none font-medium text-[#6b7280]">
+                      +{hiddenCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
