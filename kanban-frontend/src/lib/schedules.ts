@@ -24,7 +24,7 @@ export interface Schedule {
   startDate: string; // YYYY-MM-DD
   endDate: string; // 하루짜리 일정이면 startDate와 같음
   startTime: string | null; // HH:mm:ss, 시작일 기준
-  endTime: string | null; // 종료일 기준
+  endTime: string | null; // 종료일 기준 — 화면에서 종료 시간을 뺐기 때문에 새로 저장하는 일정은 null
   color: string | null;
   createdBy: number;
   createdAt: string;
