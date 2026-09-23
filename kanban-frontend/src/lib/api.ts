@@ -2,7 +2,7 @@
 // 앞으로 칸반보드/팀/파일 등 새 기능을 만들 때는 이 파일의 apiRequest()를 사용하면
 // 로그인 토큰이 자동으로 실리고, 토큰이 만료됐을 때도 자동으로 처리돼요.
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 const TOKEN_KEY = "kanban_access_token";
 const USER_KEY = "kanban_user";
@@ -56,10 +56,14 @@ async function toResult<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** 로그인 없이 호출하는 API (회원가입, 로그인 등). */
+/**
+ * 로그인 없이 호출하는 API (회원가입, 로그인 등).
+ * refresh token은 응답 body가 아니라 httpOnly 쿠키로 내려오므로 credentials: "include" 필수.
+ */
 export async function publicRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -76,14 +80,28 @@ export async function publicRequest<T>(path: string, options: RequestInit = {}):
  * 로그인 토큰이 필요한 모든 API 호출은 이 함수로.
  * - Authorization: Bearer <토큰> 헤더 자동 첨부
  * - 401(토큰 만료/무효) 응답이면 세션 정리하고 로그인 페이지로 자동 이동
+ * - body가 FormData(파일 업로드)면 Content-Type은 브라우저가 boundary와 함께 채우도록 비워둠
  */
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await authorizedFetch(path, options);
+  return toResult<T>(res);
+}
+
+/** 파일 다운로드처럼 JSON이 아닌 응답을 Blob으로 받을 때 사용. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const res = await authorizedFetch(path);
+  return res.blob();
+}
+
+async function authorizedFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
+  const isFormData = options.body instanceof FormData;
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
@@ -101,5 +119,5 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     throw new ApiError(res.status, await parseErrorMessage(res));
   }
 
-  return toResult<T>(res);
+  return res;
 }

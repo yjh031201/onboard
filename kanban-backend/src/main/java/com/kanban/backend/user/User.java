@@ -32,7 +32,8 @@ public class User {
     @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(nullable = false, length = 255)
+    // 소셜 로그인 전용 계정은 비밀번호가 없다.
+    @Column(length = 255)
     private String password;
 
     @Column(nullable = false, length = 100)
@@ -42,14 +43,39 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserRole role = UserRole.MEMBER;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_id", length = 255)
+    private String providerId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 이메일/비밀번호 회원가입. */
     public User(String email, String password, String name) {
         this.email = email;
         this.password = password;
         this.name = name;
         this.role = UserRole.MEMBER;
+        this.provider = AuthProvider.LOCAL;
+    }
+
+    /** 구글/네이버 등 소셜 로그인으로 처음 가입하는 경우 — 비밀번호 없이 생성된다. */
+    public User(String email, String name, AuthProvider provider, String providerId) {
+        this.email = email;
+        this.password = null;
+        this.name = name;
+        this.role = UserRole.MEMBER;
+        this.provider = provider;
+        this.providerId = providerId;
+    }
+
+    /** 기존 이메일/비밀번호 계정에 소셜 로그인 수단을 연결(link)할 때 사용. */
+    public void linkProvider(AuthProvider provider, String providerId) {
+        this.provider = provider;
+        this.providerId = providerId;
     }
 
     @jakarta.persistence.PrePersist
