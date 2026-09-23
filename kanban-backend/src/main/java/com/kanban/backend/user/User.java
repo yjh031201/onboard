@@ -38,12 +38,9 @@ public class User {
     @Column(nullable = false, length = 100)
     private String name;
 
-<<<<<<< HEAD
-=======
     @Column(nullable = false, unique = true, length = 20)
     private String phone;
 
->>>>>>> origin/feature/teamsetting
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role = UserRole.MEMBER;
@@ -51,15 +48,6 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-<<<<<<< HEAD
-    public User(String email, String password, String name) {
-        this.email = email;
-        this.password = password;
-        this.name = name;
-        this.role = UserRole.MEMBER;
-    }
-
-=======
     public User(String email, String password, String name, String phone) {
         this.email = email;
         this.password = password;
@@ -84,7 +72,6 @@ public class User {
         this.role = role;
     }
 
->>>>>>> origin/feature/teamsetting
     @jakarta.persistence.PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
