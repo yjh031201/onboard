@@ -8,6 +8,7 @@ public record TimelineEventResponse(
         Long id,
         TimelineEventType type,
         String message,
+        Long actorId,
         String actorName,
         boolean notified,
         LocalDateTime createdAt
@@ -17,6 +18,7 @@ public record TimelineEventResponse(
                 event.getId(),
                 event.getType(),
                 event.getMessage(),
+                event.getActorId(),
                 event.getActorName(),
                 event.isNotified(),
                 event.getCreatedAt()

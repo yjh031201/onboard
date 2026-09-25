@@ -1,14 +1,15 @@
 package com.kanban.backend.board.dto;
 
 import com.kanban.backend.board.Card;
-import com.kanban.backend.board.CardStatus;
 import java.time.LocalDateTime;
 
 public record CardResponse(
         Long id,
         String title,
-        CardStatus status,
+        String status,
         int position,
+        String labelId,
+        Long createdById,
         String createdByName,
         LocalDateTime createdAt
 ) {
@@ -18,6 +19,8 @@ public record CardResponse(
                 card.getTitle(),
                 card.getStatus(),
                 card.getPosition(),
+                card.getLabelId(),
+                card.getCreatedById(),
                 card.getCreatedByName(),
                 card.getCreatedAt()
         );

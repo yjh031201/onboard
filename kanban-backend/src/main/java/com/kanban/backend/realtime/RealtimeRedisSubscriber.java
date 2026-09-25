@@ -24,7 +24,10 @@ public class RealtimeRedisSubscriber implements MessageListener {
     private static final Map<String, String> CHANNEL_TO_TOPIC = Map.of(
             RealtimeChannels.BOARD_EVENTS, RealtimeChannels.BOARD_TOPIC,
             RealtimeChannels.PRESENCE_EVENTS, RealtimeChannels.PRESENCE_TOPIC,
-            RealtimeChannels.TIMELINE_EVENTS, RealtimeChannels.TIMELINE_TOPIC
+            RealtimeChannels.TIMELINE_EVENTS, RealtimeChannels.TIMELINE_TOPIC,
+            RealtimeChannels.TIMELINE_DELETED_EVENTS, RealtimeChannels.TIMELINE_DELETED_TOPIC,
+            RealtimeChannels.LABEL_EVENTS, RealtimeChannels.LABEL_TOPIC,
+            RealtimeChannels.COLUMN_EVENTS, RealtimeChannels.COLUMN_TOPIC
     );
 
     private final SimpMessagingTemplate messagingTemplate;

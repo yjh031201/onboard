@@ -7,5 +7,9 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     List<Card> findAllByOrderByStatusAscPositionAsc();
 
-    List<Card> findAllByStatusOrderByPositionAsc(CardStatus status);
+    List<Card> findAllByStatusOrderByPositionAsc(String status);
+
+    boolean existsByStatus(String status);
+
+    List<Card> findAllByLabelId(String labelId);
 }

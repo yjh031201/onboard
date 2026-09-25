@@ -21,13 +21,15 @@ export interface TeamMember {
   status: PresenceStatus;
 }
 
-/** Matches the backend's CardStatus enum (com.kanban.backend.board.CardStatus). */
-export type CardStatus = "TODO" | "IN_PROGRESS" | "DONE";
+/** 카드가 들어 있는 컬럼의 id (board_columns.id) — 기본 컬럼은 TODO / IN_PROGRESS / DONE. */
+export type CardStatus = string;
 
 export interface TaskCard {
   id: string;
   title: string;
   status: CardStatus;
+  labelId: string | null;
+  createdById: number;
   createdByName: string;
   createdAt: string;
 }
@@ -42,6 +44,7 @@ export interface TimelineEventDto {
   id: number;
   type: "CARD_CREATED" | "CARD_MOVED";
   message: string;
+  actorId: number;
   actorName: string;
   notified: boolean;
   createdAt: string;

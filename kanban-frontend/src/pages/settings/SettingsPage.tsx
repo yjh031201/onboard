@@ -6,31 +6,9 @@ import Button from "../../components/ui/Button";
 import Toggle from "../../components/ui/Toggle";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
+import ColumnSettings from "../../components/settings/ColumnSettings";
+import LabelSettings from "../../components/settings/LabelSettings";
 import { getProjectSettings, updateProjectSettings } from "../../lib/settings";
-
-interface BoardColumn {
-  id: string;
-  name: string;
-}
-
-const INITIAL_COLUMNS: BoardColumn[] = [
-  { id: "todo", name: "할 일" },
-  { id: "in-progress", name: "진행 중" },
-  { id: "done", name: "완료" },
-];
-
-interface LabelDef {
-  id: string;
-  name: string;
-  color: string;
-}
-
-const INITIAL_LABELS: LabelDef[] = [
-  { id: "bug", name: "버그", color: "#ef4444" },
-  { id: "feature", name: "기능", color: "#6366f1" },
-  { id: "design", name: "디자인", color: "#a855f7" },
-  { id: "urgent", name: "긴급", color: "#f59e0b" },
-];
 
 export default function SettingsPage() {
   const currentUser = getStoredUser();
@@ -42,8 +20,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
-  const [columns] = useState<BoardColumn[]>(INITIAL_COLUMNS);
-  const [labels] = useState<LabelDef[]>(INITIAL_LABELS);
   const [cardMoveNotif, setCardMoveNotif] = useState(true);
   const [commentNotif, setCommentNotif] = useState(true);
   const [dueDateNotif, setDueDateNotif] = useState(false);
@@ -126,54 +102,9 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="보드 컬럼" description="칸반보드에 표시할 컬럼을 관리하세요">
-        {columns.map((column, i) => (
-          <div key={column.id} className="flex w-full flex-col gap-[18px]">
-            {i > 0 && <Divider />}
-            <div className="flex w-full items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-[13px] font-bold text-[#9ca3af]">⠿</span>
-                <p className="text-[13.5px] font-medium text-[#111827]">{column.name}</p>
-              </div>
-              <div className="flex items-center gap-3.5 text-[12.5px]">
-                <button type="button" className="text-[#6366f1]">
-                  이름 변경
-                </button>
-                <button type="button" className="text-[#9ca3af]">
-                  삭제
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        <Button variant="secondary">+ 컬럼 추가</Button>
-      </Section>
+      <ColumnSettings />
 
-      <Section title="라벨" description="카드에 붙일 라벨 색상과 이름을 관리하세요">
-        {labels.map((label, i) => (
-          <div key={label.id} className="flex w-full flex-col gap-[18px]">
-            {i > 0 && <Divider />}
-            <div className="flex w-full items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="size-3.5 rounded-[4px]"
-                  style={{ backgroundColor: label.color }}
-                />
-                <p className="text-[13.5px] font-medium text-[#111827]">{label.name}</p>
-              </div>
-              <div className="flex items-center gap-3.5 text-[12.5px]">
-                <button type="button" className="text-[#6366f1]">
-                  편집
-                </button>
-                <button type="button" className="text-[#9ca3af]">
-                  삭제
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        <Button variant="secondary">+ 라벨 추가</Button>
-      </Section>
+      <LabelSettings />
 
       <Section title="알림" description="이 프로젝트에서 받을 알림을 설정하세요">
         <div className="flex w-full items-center justify-between">

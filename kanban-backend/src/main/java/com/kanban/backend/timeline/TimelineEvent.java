@@ -1,5 +1,7 @@
 package com.kanban.backend.timeline;
 
+import com.kanban.backend.user.User;
+import com.kanban.backend.user.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,6 +55,11 @@ public class TimelineEvent {
         this.actorId = actorId;
         this.actorName = actorName;
         this.notified = notified;
+    }
+
+    /** 기록된 행동을 한 본인이거나 관리자(OWNER/ADMIN)면 삭제 가능. */
+    public boolean isDeletableBy(User user) {
+        return actorId.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
     }
 
     @jakarta.persistence.PrePersist
