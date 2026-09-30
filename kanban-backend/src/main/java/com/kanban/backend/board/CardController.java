@@ -1,6 +1,7 @@
 package com.kanban.backend.board;
 
 import com.kanban.backend.board.dto.CardResponse;
+import com.kanban.backend.board.dto.ChangeCardLabelRequest;
 import com.kanban.backend.board.dto.CreateCardRequest;
 import com.kanban.backend.board.dto.MoveCardRequest;
 import com.kanban.backend.user.User;
@@ -9,6 +10,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,5 +49,20 @@ public class CardController {
             @AuthenticationPrincipal User actor
     ) {
         return ResponseEntity.ok(cardService.move(id, request, actor));
+    }
+
+    @PatchMapping("/{id}/label")
+    public ResponseEntity<CardResponse> changeLabel(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeCardLabelRequest request,
+            @AuthenticationPrincipal User actor
+    ) {
+        return ResponseEntity.ok(cardService.changeLabel(id, request, actor));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal User actor) {
+        cardService.delete(id, actor);
+        return ResponseEntity.noContent().build();
     }
 }

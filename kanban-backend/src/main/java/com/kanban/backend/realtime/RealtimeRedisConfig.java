@@ -28,6 +28,9 @@ public class RealtimeRedisConfig {
         container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.BOARD_EVENTS));
         container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.PRESENCE_EVENTS));
         container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.TIMELINE_EVENTS));
+        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.TIMELINE_DELETED_EVENTS));
+        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.LABEL_EVENTS));
+        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.COLUMN_EVENTS));
         return container;
     }
 }

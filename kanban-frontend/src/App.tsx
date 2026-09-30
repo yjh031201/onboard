@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
+import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
 import FindIdPage from "./pages/auth/FindIdPage";
@@ -21,8 +22,10 @@ function App() {
       <Route path="/find-password" element={<FindPasswordPage />} />
       <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
 
+      <Route path="/" element={<HomePage />} />
+
       <Route element={<AppLayout />}>
-        <Route index element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/kanban" element={<KanbanPage />} />
         <Route path="/timeline" element={<TimelinePage />} />
         <Route path="/members" element={<MembersPage />} />

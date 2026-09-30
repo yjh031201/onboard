@@ -8,7 +8,7 @@ interface NavItemDef {
 }
 
 const NAV_ITEMS: NavItemDef[] = [
-  { to: "/", label: "대시보드", icon: "🏠", end: true },
+  { to: "/dashboard", label: "대시보드", icon: "🏠", end: true },
   { to: "/kanban", label: "칸반보드", icon: "📌" },
   { to: "/timeline", label: "타임라인", icon: "🕒" },
   { to: "/members", label: "팀원", icon: "👥" },

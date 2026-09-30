@@ -6,3 +6,8 @@ import type { TimelineEventDto } from "../types/dashboard";
 export function fetchTimeline(limit = 50): Promise<TimelineEventDto[]> {
   return apiRequest<TimelineEventDto[]>(`/api/timeline?limit=${limit}`);
 }
+
+/** 본인 기록이거나 OWNER/ADMIN만 성공함 (서버에서 검증). */
+export function deleteTimelineEvent(id: number): Promise<void> {
+  return apiRequest<void>(`/api/timeline/${id}`, { method: "DELETE" });
+}
