@@ -2,13 +2,20 @@ package com.kanban.backend.board;
 
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,6 +25,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Card {
+
+    /** 카드 하나에 붙일 수 있는 라벨 수. */
+    public static final int MAX_LABELS = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,9 +44,16 @@ public class Card {
     @Column(nullable = false)
     private int position;
 
-    /** 설정 페이지 라벨의 id (예: "bug"). 라벨이 없으면 null. */
-    @Column(name = "label_id", length = 30)
-    private String labelId;
+    /** 설정 페이지 라벨의 id 목록 (예: "bug"), 붙인 순서대로. 최대 MAX_LABELS개. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "card_labels", joinColumns = @JoinColumn(name = "card_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "label_id", length = 30, nullable = false)
+    private List<String> labelIds = new ArrayList<>();
+
+    /** 마감 일시. 없으면 null. */
+    @Column(name = "due_at")
+    private LocalDateTime dueAt;
 
     @Column(name = "created_by_id", nullable = false)
     private Long createdById;
@@ -50,11 +67,20 @@ public class Card {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Card(String title, String status, int position, String labelId, Long createdById, String createdByName) {
+    public Card(
+            String title,
+            String status,
+            int position,
+            List<String> labelIds,
+            LocalDateTime dueAt,
+            Long createdById,
+            String createdByName
+    ) {
         this.title = title;
         this.status = status;
         this.position = position;
-        this.labelId = labelId;
+        this.labelIds = new ArrayList<>(labelIds);
+        this.dueAt = dueAt;
         this.createdById = createdById;
         this.createdByName = createdByName;
     }
@@ -68,12 +94,23 @@ public class Card {
         this.position = position;
     }
 
-    public void changeLabel(String labelId) {
-        this.labelId = labelId;
+    public void changeLabels(List<String> labelIds) {
+        this.labelIds.clear();
+        this.labelIds.addAll(labelIds);
     }
 
-    /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 삭제 가능. */
-    public boolean isDeletableBy(User user) {
+    /** 라벨이 삭제됐을 때 — 붙어 있었으면 떼고 true. */
+    public boolean removeLabel(String labelId) {
+        return this.labelIds.remove(labelId);
+    }
+
+    public void update(String title, LocalDateTime dueAt) {
+        this.title = title;
+        this.dueAt = dueAt;
+    }
+
+    /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정·삭제 가능. */
+    public boolean isManageableBy(User user) {
         return createdById.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
     }
 

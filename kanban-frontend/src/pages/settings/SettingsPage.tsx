@@ -9,7 +9,11 @@ import { getStoredUser } from "../../lib/auth";
 import ColumnSettings from "../../components/settings/ColumnSettings";
 import LabelSettings from "../../components/settings/LabelSettings";
 import { getProjectSettings, updateProjectSettings } from "../../lib/settings";
-import { getNotificationSettings, setNotificationSetting } from "../../lib/notificationSettings";
+import {
+  getNotificationSettings,
+  setNotificationSetting,
+  type NotificationSettings,
+} from "../../lib/notificationSettings";
 
 export default function SettingsPage() {
   const currentUser = getStoredUser();
@@ -23,7 +27,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [notifSettings, setNotifSettings] = useState(getNotificationSettings);
 
-  const updateNotifSetting = (key: "cardMoveNotif" | "commentNotif" | "dueDateNotif", value: boolean) => {
+  const updateNotifSetting = (key: keyof NotificationSettings, value: boolean) => {
     setNotifSettings(setNotificationSetting(key, value));
   };
 
@@ -124,13 +128,25 @@ export default function SettingsPage() {
         <Divider />
         <div className="flex w-full items-center justify-between">
           <div className="flex flex-col gap-[3px]">
-            <p className="text-[13.5px] font-medium text-[#111827]">댓글 알림</p>
-            <p className="text-[12px] text-[#6b7280]">카드에 새 댓글이 달리면 알려드려요</p>
+            <p className="text-[13.5px] font-medium text-[#111827]">새 카드 알림</p>
+            <p className="text-[12px] text-[#6b7280]">새로운 카드가 만들어지면 알려드려요</p>
           </div>
           <Toggle
-            checked={notifSettings.commentNotif}
-            onChange={(next) => updateNotifSetting("commentNotif", next)}
-            label="댓글 알림"
+            checked={notifSettings.cardCreateNotif}
+            onChange={(next) => updateNotifSetting("cardCreateNotif", next)}
+            label="새 카드 알림"
+          />
+        </div>
+        <Divider />
+        <div className="flex w-full items-center justify-between">
+          <div className="flex flex-col gap-[3px]">
+            <p className="text-[13.5px] font-medium text-[#111827]">라벨 변경 알림</p>
+            <p className="text-[12px] text-[#6b7280]">카드에 라벨이 추가되거나 바뀌면 알려드려요</p>
+          </div>
+          <Toggle
+            checked={notifSettings.labelChangeNotif}
+            onChange={(next) => updateNotifSetting("labelChangeNotif", next)}
+            label="라벨 변경 알림"
           />
         </div>
         <Divider />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildMonthGrid, getWeekdayLabels } from "../../utils/calendar";
-import type { ScheduleDate } from "../../types/dashboard";
+import type { ScheduleDate, TaskCard } from "../../types/dashboard";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
 import {
@@ -78,7 +78,15 @@ function sortByStart(a: Schedule, b: Schedule): number {
 
 type ModalState = { mode: "add" } | { mode: "edit"; schedule: Schedule } | null;
 
-export default function CalendarWidget() {
+/** 카드 마감 표시 색 — 일정 막대와 구분되도록 점으로만 쓴다. */
+const CARD_DUE_COLOR = "#ef4444";
+
+interface CalendarWidgetProps {
+  /** 마감일이 있는 칸반 카드도 해당 날짜에 표시한다. */
+  cards?: TaskCard[];
+}
+
+export default function CalendarWidget({ cards = [] }: CalendarWidgetProps) {
   const [today] = useState(todayDate);
   const currentUser = getStoredUser();
 
@@ -118,8 +126,15 @@ export default function CalendarWidget() {
   const schedulesOn = (isoDate: string) =>
     schedules.filter((s) => s.startDate <= isoDate && isoDate <= s.endDate);
 
+  /** 해당 날짜가 마감인 카드들 (마감 시각 순) — dueAt "YYYY-MM-DDTHH:mm:ss"의 날짜 부분으로 비교 */
+  const dueCardsOn = (isoDate: string) =>
+    cards
+      .filter((card) => card.dueAt?.slice(0, 10) === isoDate)
+      .sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? ""));
+
   const selectedIso = toIsoDate(viewYear, viewMonth, selectedDay);
   const selectedSchedules = schedulesOn(selectedIso);
+  const selectedDueCards = dueCardsOn(selectedIso);
   const selectedDate: ScheduleDate = { year: viewYear, monthIndex: viewMonth, date: selectedDay };
 
   // 작성자 본인이거나 OWNER/ADMIN이면 수정/삭제 가능 (서버에서도 동일하게 검증됨).
@@ -248,6 +263,13 @@ export default function CalendarWidget() {
                       +{hiddenCount}
                     </span>
                   )}
+                  {iso && dueCardsOn(iso).length > 0 && (
+                    <span
+                      title="카드 마감"
+                      className="size-1 rounded-full"
+                      style={{ backgroundColor: CARD_DUE_COLOR }}
+                    />
+                  )}
                 </button>
               );
             })}
@@ -261,7 +283,7 @@ export default function CalendarWidget() {
         <p className="text-[12px] font-medium text-[#6b7280]">
           {viewMonth + 1}월 {selectedDay}일 일정
         </p>
-        {selectedSchedules.length === 0 ? (
+        {selectedSchedules.length === 0 && selectedDueCards.length === 0 ? (
           <p className="text-[12px] text-[#9ca3af]">등록된 일정이 없어요.</p>
         ) : (
           selectedSchedules.map((schedule) => (
@@ -284,6 +306,13 @@ export default function CalendarWidget() {
             </button>
           ))
         )}
+        {selectedDueCards.map((card) => (
+          <div key={`card-${card.id}`} className="flex w-full items-center gap-2 px-2 py-1.5">
+            <span className="size-2 shrink-0 rotate-45 rounded-[1px]" style={{ backgroundColor: CARD_DUE_COLOR }} />
+            <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#111827]">{card.title}</span>
+            <span className="shrink-0 text-[11px] text-[#6b7280]">카드 마감 · {card.dueAt?.slice(11, 16)}</span>
+          </div>
+        ))}
       </div>
 
       <button
