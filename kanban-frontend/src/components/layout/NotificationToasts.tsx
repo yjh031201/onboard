@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { subscribeTopic } from "../../lib/realtime";
+import { getNotificationSettings } from "../../lib/notificationSettings";
 import type { TimelineEventDto } from "../../types/dashboard";
 
 interface ToastItem extends TimelineEventDto {
@@ -16,6 +17,7 @@ export default function NotificationToasts() {
   useEffect(() => {
     return subscribeTopic<TimelineEventDto>("/topic/timeline", (event) => {
       if (!event.notified) return;
+      if (event.type === "CARD_MOVED" && !getNotificationSettings().cardMoveNotif) return;
 
       const toastId = ++toastSeq;
       setToasts((prev) => [...prev, { ...event, toastId }]);

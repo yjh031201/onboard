@@ -7,6 +7,7 @@ import Toggle from "../../components/ui/Toggle";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
 import { getProjectSettings, updateProjectSettings } from "../../lib/settings";
+import { getNotificationSettings, setNotificationSetting } from "../../lib/notificationSettings";
 
 interface BoardColumn {
   id: string;
@@ -44,9 +45,11 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [columns] = useState<BoardColumn[]>(INITIAL_COLUMNS);
   const [labels] = useState<LabelDef[]>(INITIAL_LABELS);
-  const [cardMoveNotif, setCardMoveNotif] = useState(true);
-  const [commentNotif, setCommentNotif] = useState(true);
-  const [dueDateNotif, setDueDateNotif] = useState(false);
+  const [notifSettings, setNotifSettings] = useState(getNotificationSettings);
+
+  const updateNotifSetting = (key: "cardMoveNotif" | "commentNotif" | "dueDateNotif", value: boolean) => {
+    setNotifSettings(setNotificationSetting(key, value));
+  };
 
   useEffect(() => {
     getProjectSettings()
@@ -181,7 +184,11 @@ export default function SettingsPage() {
             <p className="text-[13.5px] font-medium text-[#111827]">카드 이동 알림</p>
             <p className="text-[12px] text-[#6b7280]">카드가 다른 컬럼으로 이동하면 알려드려요</p>
           </div>
-          <Toggle checked={cardMoveNotif} onChange={setCardMoveNotif} label="카드 이동 알림" />
+          <Toggle
+            checked={notifSettings.cardMoveNotif}
+            onChange={(next) => updateNotifSetting("cardMoveNotif", next)}
+            label="카드 이동 알림"
+          />
         </div>
         <Divider />
         <div className="flex w-full items-center justify-between">
@@ -189,7 +196,11 @@ export default function SettingsPage() {
             <p className="text-[13.5px] font-medium text-[#111827]">댓글 알림</p>
             <p className="text-[12px] text-[#6b7280]">카드에 새 댓글이 달리면 알려드려요</p>
           </div>
-          <Toggle checked={commentNotif} onChange={setCommentNotif} label="댓글 알림" />
+          <Toggle
+            checked={notifSettings.commentNotif}
+            onChange={(next) => updateNotifSetting("commentNotif", next)}
+            label="댓글 알림"
+          />
         </div>
         <Divider />
         <div className="flex w-full items-center justify-between">
@@ -197,7 +208,11 @@ export default function SettingsPage() {
             <p className="text-[13.5px] font-medium text-[#111827]">마감일 알림</p>
             <p className="text-[12px] text-[#6b7280]">마감일이 임박한 카드를 알려드려요</p>
           </div>
-          <Toggle checked={dueDateNotif} onChange={setDueDateNotif} label="마감일 알림" />
+          <Toggle
+            checked={notifSettings.dueDateNotif}
+            onChange={(next) => updateNotifSetting("dueDateNotif", next)}
+            label="마감일 알림"
+          />
         </div>
       </Section>
 
