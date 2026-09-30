@@ -1,5 +1,8 @@
 import PageShell from "../../components/layout/PageShell";
 import { useTimelineFeed } from "../../hooks/useTimelineFeed";
+import { ApiError } from "../../lib/api";
+import { getStoredUser } from "../../lib/auth";
+import { deleteTimelineEvent } from "../../lib/timeline";
 import type { TimelineEventDto } from "../../types/dashboard";
 
 const TYPE_ICON: Record<TimelineEventDto["type"], { icon: string; bg: string }> = {
@@ -50,6 +53,19 @@ function groupByDay(events: TimelineEventDto[]): TimelineGroup[] {
 export default function TimelinePage() {
   const events = useTimelineFeed();
   const groups = groupByDay(events);
+  const currentUser = getStoredUser();
+
+  // 본인 기록이거나 OWNER/ADMIN만 삭제 가능 (서버에서도 동일하게 검증됨).
+  const canDelete = (entry: TimelineEventDto) =>
+    entry.actorId === currentUser?.id || currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+
+  const removeEntry = (entry: TimelineEventDto) => {
+    if (!window.confirm("이 활동 기록을 삭제할까요?")) return;
+    // 목록 반영은 /topic/timeline-deleted 브로드캐스트로 이루어진다.
+    deleteTimelineEvent(entry.id).catch((err) => {
+      window.alert(err instanceof ApiError ? err.message : "활동 기록을 삭제하지 못했어요.");
+    });
+  };
 
   return (
     <PageShell title="타임라인" subtitle="팀의 최근 활동을 시간순으로 확인하세요">
@@ -79,8 +95,21 @@ export default function TimelinePage() {
                         <div className="w-0.5 flex-1 bg-[#e7e8eb]" />
                       )}
                     </div>
-                    <div className="flex flex-1 flex-col gap-1.5 pb-[18px]">
-                      <p className="break-keep text-[13.5px] text-[#111827]">{entry.message}</p>
+                    <div className="group flex flex-1 flex-col gap-1.5 pb-[18px]">
+                      <div className="flex w-full items-start gap-2">
+                        <p className="flex-1 break-keep text-[13.5px] text-[#111827]">{entry.message}</p>
+                        {canDelete(entry) && (
+                          <button
+                            type="button"
+                            title="기록 삭제"
+                            aria-label="활동 기록 삭제"
+                            onClick={() => removeEntry(entry)}
+                            className="shrink-0 rounded px-1 text-[14px] leading-none text-[#9ca3af] opacity-0 hover:text-[#ef4444] group-hover:opacity-100 focus:opacity-100"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         <p className="text-[12px] text-[#6b7280]">{formatTime(new Date(entry.createdAt))}</p>
                         {entry.notified && (
