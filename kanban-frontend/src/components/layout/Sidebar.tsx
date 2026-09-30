@@ -24,7 +24,7 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <div
-      className={`flex h-full shrink-0 flex-col gap-7 border border-[#ececee] bg-white py-6 ${
+      className={`sticky top-0 flex h-screen shrink-0 flex-col gap-7 border border-[#ececee] bg-white py-6 ${
         collapsed ? "w-[72px] items-center px-4" : "w-[240px] px-5"
       }`}
     >

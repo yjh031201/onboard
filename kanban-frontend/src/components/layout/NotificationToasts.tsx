@@ -17,7 +17,10 @@ export default function NotificationToasts() {
   useEffect(() => {
     return subscribeTopic<TimelineEventDto>("/topic/timeline", (event) => {
       if (!event.notified) return;
-      if (event.type === "CARD_MOVED" && !getNotificationSettings().cardMoveNotif) return;
+      const settings = getNotificationSettings();
+      if (event.type === "CARD_MOVED" && !settings.cardMoveNotif) return;
+      if (event.type === "CARD_CREATED" && !settings.cardCreateNotif) return;
+      if (event.type === "CARD_LABEL_CHANGED" && !settings.labelChangeNotif) return;
 
       const toastId = ++toastSeq;
       setToasts((prev) => [...prev, { ...event, toastId }]);
@@ -37,7 +40,7 @@ export default function NotificationToasts() {
           className="flex items-start gap-2.5 rounded-xl border border-[#f0f0f2] bg-white p-3.5 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.12)]"
         >
           <span className="mt-0.5 shrink-0 text-[14px]">🔔</span>
-          <p className="flex-1 break-keep text-[13px] text-[#111827]">{toast.message}</p>
+          <p className="min-w-0 flex-1 break-keep text-[13px] text-[#111827] [overflow-wrap:anywhere]">{toast.message}</p>
         </div>
       ))}
     </div>

@@ -6,13 +6,15 @@ const STORAGE_KEY = "kanban_notification_settings";
 
 export interface NotificationSettings {
   cardMoveNotif: boolean;
-  commentNotif: boolean;
+  cardCreateNotif: boolean;
+  labelChangeNotif: boolean;
   dueDateNotif: boolean;
 }
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   cardMoveNotif: true,
-  commentNotif: true,
+  cardCreateNotif: true,
+  labelChangeNotif: true,
   dueDateNotif: false,
 };
 

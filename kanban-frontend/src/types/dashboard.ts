@@ -28,7 +28,10 @@ export interface TaskCard {
   id: string;
   title: string;
   status: CardStatus;
-  labelId: string | null;
+  /** 붙인 순서대로, 최대 2개 (MAX_CARD_LABELS). */
+  labelIds: string[];
+  /** 마감 일시 "YYYY-MM-DDTHH:mm:ss" (서버 LocalDateTime), 없으면 null. */
+  dueAt: string | null;
   createdById: number;
   createdByName: string;
   createdAt: string;
@@ -42,7 +45,7 @@ export interface KanbanColumn {
 
 export interface TimelineEventDto {
   id: number;
-  type: "CARD_CREATED" | "CARD_MOVED";
+  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED";
   message: string;
   actorId: number;
   actorName: string;
@@ -50,15 +53,6 @@ export interface TimelineEventDto {
   createdAt: string;
 }
 
-export interface ProgressCardData {
-  id: string;
-  label: string;
-  count: number;
-  percent: number;
-  badgeBg: string;
-  badgeText: string;
-  barColor: string;
-}
 
 export interface CalendarDay {
   date: number;

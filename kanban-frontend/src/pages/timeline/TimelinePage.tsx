@@ -8,6 +8,8 @@ import type { TimelineEventDto } from "../../types/dashboard";
 const TYPE_ICON: Record<TimelineEventDto["type"], { icon: string; bg: string }> = {
   CARD_MOVED: { icon: "↔", bg: "#feeccf" },
   CARD_CREATED: { icon: "+", bg: "#eeeefe" },
+  CARD_UPDATED: { icon: "✎", bg: "#e0f2fe" },
+  CARD_LABEL_CHANGED: { icon: "#", bg: "#f3e8ff" },
 };
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -97,7 +99,9 @@ export default function TimelinePage() {
                     </div>
                     <div className="group flex flex-1 flex-col gap-1.5 pb-[18px]">
                       <div className="flex w-full items-start gap-2">
-                        <p className="flex-1 break-keep text-[13.5px] text-[#111827]">{entry.message}</p>
+                        <p className="min-w-0 flex-1 break-keep text-[13.5px] text-[#111827] [overflow-wrap:anywhere]">
+                          {entry.message}
+                        </p>
                         {canDelete(entry) && (
                           <button
                             type="button"
