@@ -109,10 +109,48 @@ npm run dev
 - **파일**: `GET/POST/DELETE /api/files`, `GET /api/files/{id}/download` — 파일 페이지 연동됨 (드래그 앤 드롭, 파일당 최대 50MB, 로컬 디스크 저장)
 - **구글 / 네이버 로그인**: `/oauth2/authorization/google`, `/oauth2/authorization/naver` — 프론트 로그인 페이지 버튼까지 연동됨 (설정 방법은 아래 참고)
 
+- **칸반보드**: 카드 생성/이동(드래그)/수정/삭제, 보드 컬럼·라벨 설정, STOMP + Redis pub/sub 실시간 동기화, 타임라인·알림
+
 **아직 미구현:**
 - 아이디 찾기 / 비밀번호 찾기 — 화면(UI)만 있고 백엔드 API 없음
-- 칸반보드 카드 CRUD, 실시간 동기화 등 — 프론트 화면만 있고 백엔드 연동 전
+- 대시보드 칸반 위젯에서 카드 조작 (보기·삭제만 가능, 드래그·추가·수정은 칸반 페이지에서)
+- 마감일 알림 (설정 토글만 있음)
 - 파일 업로드 S3 저장 (`FileStorageService` 인터페이스만 있고 구현체는 로컬 전용)
+
+## 최근 추가된 기능 (`feature/infra`)
+
+### 대시보드
+- **진행 현황 카드 ↔ 칸반 동기화**: 고정 숫자 대신 실제 카드 수·비율을 보드 컬럼별로 계산 (컬럼을 추가·삭제하면 같이 바뀜)
+- **달력·팀원 현황 접기/펼치기**: 접으면 칸반 영역이 넓어짐 (상태는 브라우저에 저장)
+- 칸반 위젯이 화면 밖으로 잘리던 문제 수정(넘치면 가로 스크롤), 사이드바 스크롤 고정
+
+### 칸반 카드
+- **카드 수정**: ✎ 버튼으로 제목·마감 일시 수정. 권한은 삭제와 같음(작성자 또는 OWNER/ADMIN, 서버에서도 검증)
+- **마감 일시**: 카드에 `⏰ 10/2 18:00` 표시, 지나면 빨간색. 대시보드 캘린더에도 마감일이 점으로 표시됨
+- **라벨 최대 2개** + 처음부터 있는 **"기타"** 라벨
+- 긴 제목(URL 등)이 카드·알림·타임라인 밖으로 넘치지 않고 줄바꿈, 제목 입력칸 자동 높이
+- 라벨 없는 카드에 빈 줄이 생기던 문제 수정 (`+ 라벨`, ✎는 마우스를 올렸을 때만 표시)
+
+### 알림
+- 설정의 "댓글 알림" → **새 카드 알림**으로 변경, **라벨 변경 알림** 추가
+- 타임라인에 카드 수정·라벨 변경 기록 추가
+
+### 백엔드 / API 변경 (팀 공유용)
+
+| API | 변경 |
+|---|---|
+| `PATCH /api/cards/{id}` | **신규** — `{ title, dueAt }` 수정 |
+| `PATCH /api/cards/{id}/label` | `{ labelId }` → **`{ labelIds: [] }`** (최대 2개) |
+| `POST /api/cards` | `labelId` → **`labelIds`**, `dueAt`(선택) 추가 |
+| 카드 응답 | `labelId` → **`labelIds`**, `dueAt` 추가 |
+| 타임라인 타입 | `CARD_UPDATED`, `CARD_LABEL_CHANGED` 추가. 카드 생성·라벨 변경도 알림 대상 |
+
+**DB 마이그레이션 `V12__card_due_and_multi_labels.sql`**
+- `cards.due_at` 추가
+- `cards.label_id` → `card_labels`(card_id, position, label_id) 연결 테이블로 이전 (기존 라벨 자동 이전)
+- `labels`에 `etc`("기타") 추가
+
+> 새 마이그레이션은 **V13부터** 만들어 주세요.
 
 ## 구글 / 네이버 로그인 설정
 
@@ -183,6 +221,67 @@ docker compose -f docker-compose.prod.yml up -d --build
 - 프론트 Dockerfile은 빌드 시점에 `VITE_API_BASE_URL`을 박아 넣으므로, 배포 도메인이 바뀌면
   `.env`의 값을 바꾸고 다시 빌드해야 함
 - CORS 허용 origin은 `CORS_ALLOWED_ORIGINS` 환경변수로 관리 (콤마로 여러 개 가능)
+
+## 운영 배포 (AWS EC2 + 도메인)
+
+**접속 주소: https://onboard-kanban.duckdns.org**
+
+**`master`에 머지되면 자동으로 배포됩니다.** 서버가 1분마다 GitHub를 확인해서 새 커밋이 있으면
+받아서 다시 빌드·실행합니다. 서버에서 직접 빌드하므로 반영까지 **5~10분** 걸립니다.
+master가 깨진 상태로 머지되면 사이트도 같이 깨지니 PR에서 CI 통과를 확인하고 머지하세요.
+
+### 구성
+
+```
+브라우저 ──HTTPS──▶ Caddy(80/443, 인증서 자동 발급·갱신)
+                     ├─ /api/*, /ws/*, /oauth2/*, /login/oauth2/* ──▶ backend(Spring Boot :8080)
+                     └─ 그 외 ────────────────────────────────────▶ frontend(nginx :80)
+                     backend ──▶ MySQL, Redis (같은 서버의 컨테이너, 외부 비공개)
+```
+
+| 항목 | 내용 |
+|---|---|
+| 서버 | AWS EC2 서울(ap-northeast-2), t3.micro(1GB) + 스왑 4GB, Ubuntu 26.04, 저장공간 20GB |
+| 도메인 | DuckDNS 무료 서브도메인 `onboard-kanban.duckdns.org` → EC2 퍼블릭 IP |
+| HTTPS | Caddy가 Let's Encrypt 인증서 자동 발급 |
+| 자동 배포 | systemd 타이머(`onboard-deploy.timer`) → `/opt/onboard/bin/auto-deploy.sh` |
+| 비용 | AWS 무료 플랜 크레딧에서 차감 (서버·저장공간·IP 합쳐 약 $15/월) |
+
+프론트와 백엔드를 **같은 도메인**으로 묶은 이유: refresh token 쿠키가 `SameSite=Lax`라서 도메인이 다르면
+쿠키가 전달되지 않아 로그인 유지가 깨집니다.
+
+### 관련 파일 (`deploy/`)
+
+| 파일 | 역할 |
+|---|---|
+| `Caddyfile` | 경로별로 backend / frontend에 연결하는 리버스 프록시 설정 |
+| `docker-compose.server.yml` | `docker-compose.prod.yml` 위에 겹치는 서버용 설정 (Caddy 추가, 80/443만 외부 공개) |
+| `auto-deploy.sh` | 새 커밋 확인 → `git reset` → `docker compose up -d --build` |
+| `setup-server.sh` | 새 서버 최초 1회 설정 (Docker, 스왑, 방화벽, 저장소 clone, `.env` 생성, 자동 배포 타이머) |
+
+서버의 비밀값(DB 비밀번호, JWT 시크릿 등)은 **서버의 `/opt/onboard/config/.env`에만** 있고 저장소에는 올라가지 않습니다.
+`deploy/`의 설정 파일도 서버에는 `/opt/onboard/config/`에 복사해 두고 쓰기 때문에, 이 폴더를 고쳤으면 서버에도 다시 복사해야 반영됩니다.
+
+### 운영 시 주의사항
+
+- EC2 콘솔에서 **"종료(Terminate)"하면 서버와 DB 데이터가 영구 삭제**됩니다. 잠시 끄려면 **"중지(Stop)"**.
+- 중지 후 다시 켜면 **퍼블릭 IP가 바뀝니다** → [DuckDNS](https://www.duckdns.org)에서 IP를 다시 넣어야 접속됩니다.
+- 무료 플랜 크레딧이 떨어지거나 기간(2027-03-30)이 끝나면 서버가 멈춥니다. 계속 쓰려면 유료 전환 필요.
+- 운영 DB는 로컬과 별개인 빈 DB입니다 (회원가입부터 새로).
+- **구글·네이버 로그인은 운영에서 아직 안 됩니다.** 각 개발자 콘솔에 리디렉션 URI
+  `https://onboard-kanban.duckdns.org/login/oauth2/code/google`(naver)을 등록하고, 서버 `.env`의
+  `GOOGLE_*`, `NAVER_*` 값을 바꾼 뒤 `sudo /opt/onboard/bin/auto-deploy.sh --force`로 재시작하세요.
+
+### 서버 관리 명령어
+
+```
+ssh -i ~/.ssh/<키파일> ubuntu@<EC2 퍼블릭 IP>
+
+sudo journalctl -u onboard-deploy -n 50                  # 자동 배포 기록
+sudo /opt/onboard/bin/auto-deploy.sh --force             # 지금 바로 다시 배포
+cd /opt/onboard/app && sudo docker compose -f docker-compose.prod.yml -f deploy/docker-compose.server.yml ps
+sudo docker logs -f kanban-backend-prod                  # 백엔드 로그
+```
 
 ## 자주 발생하는 문제
 
