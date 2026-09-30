@@ -1,9 +1,9 @@
 package com.kanban.backend.board.dto;
 
-import jakarta.validation.constraints.Size;
+import java.util.List;
 
-/** labelId가 null이면 카드에서 라벨을 뗀다. */
+/** 카드에 붙일 라벨 id 전체 목록 (최대 2개). 빈 목록이나 null이면 라벨을 모두 뗀다. */
 public record ChangeCardLabelRequest(
-        @Size(max = 30, message = "라벨 값이 올바르지 않습니다.") String labelId
+        List<String> labelIds
 ) {
 }

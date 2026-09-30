@@ -4,6 +4,7 @@ import com.kanban.backend.board.dto.CardResponse;
 import com.kanban.backend.board.dto.ChangeCardLabelRequest;
 import com.kanban.backend.board.dto.CreateCardRequest;
 import com.kanban.backend.board.dto.MoveCardRequest;
+import com.kanban.backend.board.dto.UpdateCardRequest;
 import com.kanban.backend.user.User;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -51,13 +52,22 @@ public class CardController {
         return ResponseEntity.ok(cardService.move(id, request, actor));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<CardResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateCardRequest request,
+            @AuthenticationPrincipal User actor
+    ) {
+        return ResponseEntity.ok(cardService.update(id, request, actor));
+    }
+
     @PatchMapping("/{id}/label")
-    public ResponseEntity<CardResponse> changeLabel(
+    public ResponseEntity<CardResponse> changeLabels(
             @PathVariable Long id,
             @Valid @RequestBody ChangeCardLabelRequest request,
             @AuthenticationPrincipal User actor
     ) {
-        return ResponseEntity.ok(cardService.changeLabel(id, request, actor));
+        return ResponseEntity.ok(cardService.changeLabels(id, request, actor));
     }
 
     @DeleteMapping("/{id}")
