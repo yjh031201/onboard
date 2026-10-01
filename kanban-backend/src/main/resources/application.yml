@@ -62,6 +62,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # 운영에서는 Caddy가 HTTPS를 받고 백엔드에는 http로 넘긴다. X-Forwarded-Proto/Host를 믿어야
+  # OAuth redirect_uri({baseUrl})가 https://도메인 으로 만들어진다. 신뢰 범위는 내부(사설) IP 프록시만.
+  forward-headers-strategy: native
 
 realtime:
   # 프론트엔드 dev 서버 origin — STOMP 핸드셰이크(SockJS)용. SecurityConfig의 CORS 설정과 맞춰서 관리.
