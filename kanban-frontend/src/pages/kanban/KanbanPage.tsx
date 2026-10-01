@@ -117,27 +117,42 @@ export default function KanbanPage() {
                         handleDrop(column.id, task.id);
                       }}
                       title={`${task.createdByName}님이 작성`}
-                      className={`group flex min-h-[52px] w-full cursor-grab flex-col justify-center gap-2 rounded-lg border border-[#f0f0f2] bg-white p-3 transition-opacity active:cursor-grabbing ${
+                      className={`group relative flex min-h-[52px] w-full cursor-grab flex-col justify-center gap-2 rounded-lg border border-[#f0f0f2] bg-white p-3 transition-opacity active:cursor-grabbing ${
                         draggingId === task.id ? "opacity-40" : ""
                       }`}
                     >
-                      <div className="flex w-full items-center gap-2.5">
-                        <span
-                          className="size-2 shrink-0 rounded-sm"
-                          style={{ backgroundColor: cardLabels[0]?.color ?? column.color }}
-                        />
-                        <p className={CARD_TITLE_CLASS}>{task.title}</p>
+                      {/* hover 때만 카드 위에 겹쳐 뜨는 도구 — 레이아웃에 자리를 차지하지 않아서
+                          제목이 일찍 줄바꿈되거나 라벨 없는 카드에 빈 줄이 생기지 않는다. */}
+                      <div className="absolute top-2 right-9 hidden items-center gap-0.5 rounded-md bg-white/95 px-0.5 shadow-[0_1px_4px_rgba(0,0,0,0.08)] group-hover:flex">
+                        {cardLabels.length === 0 && (
+                          <button
+                            type="button"
+                            title="라벨 추가"
+                            onClick={() => setLabelEditingId(labelEditingId === task.id ? null : task.id)}
+                            className="rounded px-1.5 py-0.5 text-[11px] text-[#9ca3af] hover:bg-[#f0f0f2] hover:text-[#6366f1]"
+                          >
+                            + 라벨
+                          </button>
+                        )}
                         {canManage && (
                           <button
                             type="button"
                             title="카드 수정"
                             aria-label={`'${task.title}' 카드 수정`}
                             onClick={() => setEditingId(task.id)}
-                            className="flex size-5 shrink-0 items-center justify-center rounded text-[12px] leading-none text-[#9ca3af] opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f2] hover:text-[#6366f1]"
+                            className="flex size-5 items-center justify-center rounded text-[12px] leading-none text-[#9ca3af] hover:bg-[#f0f0f2] hover:text-[#6366f1]"
                           >
                             ✎
                           </button>
                         )}
+                      </div>
+
+                      <div className="flex w-full items-center gap-2.5">
+                        <span
+                          className="size-2 shrink-0 rounded-sm"
+                          style={{ backgroundColor: cardLabels[0]?.color ?? column.color }}
+                        />
+                        <p className={CARD_TITLE_CLASS}>{task.title}</p>
                         {canManage && (
                           <button
                             type="button"
@@ -151,40 +166,30 @@ export default function KanbanPage() {
                         )}
                       </div>
 
-                      <div className="flex w-full flex-wrap items-center gap-1.5 pl-[18px]">
-                        {cardLabels.map((label) => (
-                          <button
-                            key={label.id}
-                            type="button"
-                            title="라벨 변경"
-                            onClick={() => setLabelEditingId(labelEditingId === task.id ? null : task.id)}
-                            className="rounded px-1.5 py-0.5 text-[11px] font-medium text-white hover:opacity-80"
-                            style={{ backgroundColor: label.color }}
-                          >
-                            {label.name}
-                          </button>
-                        ))}
-                        {cardLabels.length === 0 && (
-                          <button
-                            type="button"
-                            title="라벨 추가"
-                            onClick={() => setLabelEditingId(labelEditingId === task.id ? null : task.id)}
-                            className={`rounded px-1.5 py-0.5 text-[11px] text-[#9ca3af] hover:bg-[#f0f0f2] ${
-                              labelEditingId === task.id ? "" : "opacity-0 group-hover:opacity-100"
-                            }`}
-                          >
-                            + 라벨
-                          </button>
-                        )}
-                        {due && (
-                          <span
-                            className={`ml-auto text-[11px] ${due.overdue ? "font-medium text-[#ef4444]" : "text-[#6b7280]"}`}
-                            title={due.overdue ? "마감이 지났어요" : "마감"}
-                          >
-                            ⏰ {due.text}
-                          </span>
-                        )}
-                      </div>
+                      {(cardLabels.length > 0 || due) && (
+                        <div className="flex w-full flex-wrap items-center gap-1.5 pl-[18px]">
+                          {cardLabels.map((label) => (
+                            <button
+                              key={label.id}
+                              type="button"
+                              title="라벨 변경"
+                              onClick={() => setLabelEditingId(labelEditingId === task.id ? null : task.id)}
+                              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-white hover:opacity-80"
+                              style={{ backgroundColor: label.color }}
+                            >
+                              {label.name}
+                            </button>
+                          ))}
+                          {due && (
+                            <span
+                              className={`ml-auto text-[11px] ${due.overdue ? "font-medium text-[#ef4444]" : "text-[#6b7280]"}`}
+                              title={due.overdue ? "마감이 지났어요" : "마감"}
+                            >
+                              ⏰ {due.text}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {labelEditingId === task.id && (
                         <div className="flex w-full flex-col gap-1.5 border-t border-[#f0f0f2] pt-2">
