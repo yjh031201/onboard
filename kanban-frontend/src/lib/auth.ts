@@ -18,7 +18,8 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
-  phone: string;
+  /** 구글/네이버로 가입한 계정은 전화번호를 안 받기 때문에 null일 수 있다. */
+  phone: string | null;
   role: string;
   /** "게스트로 이용"으로 들어온 계정이면 true — 프로젝트를 새로 만들 수 없고 초대받아 참여만 가능. */
   isGuest: boolean;

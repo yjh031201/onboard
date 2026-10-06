@@ -39,7 +39,10 @@ public class User {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 20)
+    // 소셜 로그인(구글/네이버)은 전화번호를 안 알려주기 때문에 null일 수 있다 — NOT NULL이면
+    // 그 계정의 첫 로그인(=회원가입)이 DB 제약 위반으로 실패한다(V15 마이그레이션 참고).
+    // unique는 유지해도 됨 — MySQL은 NULL끼리는 unique 충돌로 보지 않는다.
+    @Column(unique = true, length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)
