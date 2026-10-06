@@ -20,6 +20,8 @@ export interface AuthUser {
   name: string;
   phone: string;
   role: string;
+  /** "게스트로 이용"으로 들어온 계정이면 true — 프로젝트를 새로 만들 수 없고 초대받아 참여만 가능. */
+  isGuest: boolean;
 }
 
 interface AuthResponse {
@@ -78,9 +80,18 @@ export function resetPassword(name: string, email: string, newPassword: string):
   });
 }
 
-/** 구글/네이버 로그인 시작 — 전체 페이지 이동으로 백엔드 OAuth2 엔드포인트로 보낸다. */
-export function loginWithProvider(provider: "google" | "naver") {
+/**
+ * 구글/네이버 로그인 시작 — 전체 페이지 이동으로 백엔드 OAuth2 엔드포인트로 보낸다.
+ * "google-guest"는 같은 구글 로그인 창을 쓰지만 처음 가입하는 계정만 게스트(isGuest=true)로
+ * 만들어진다 — 서버(CustomOAuth2UserService)가 registrationId로 구분해서 처리.
+ */
+export function loginWithProvider(provider: "google" | "naver" | "google-guest") {
   window.location.href = `${API_BASE_URL}/oauth2/authorization/${provider}`;
+}
+
+/** 랜딩페이지의 "게스트로 이용" 버튼 전용 진입점. */
+export function loginAsGuest() {
+  loginWithProvider("google-guest");
 }
 
 /**

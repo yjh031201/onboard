@@ -43,6 +43,17 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID:dummy-google-client-id}
             client-secret: ${GOOGLE_CLIENT_SECRET:dummy-google-client-secret}
             scope: email,profile
+          # "게스트로 이용" 전용 진입점 — 같은 구글 client-id/secret을 그대로 쓰되 registrationId만
+          # 다르게 둬서, CustomOAuth2UserService가 "이 로그인은 게스트 버튼을 통해 들어왔다"를
+          # registrationId로 구분할 수 있게 한다(계정을 새로 만드는 경우에만 isGuest=true로 생성).
+          # provider: google 덕분에 authorization-uri/token-uri 등은 구글 기본값을 그대로 재사용.
+          # 구글 클라우드 콘솔의 승인된 리디렉션 URI에 {백엔드주소}/login/oauth2/code/google-guest를
+          # 추가로 등록해야 실제로 동작한다 — https://console.cloud.google.com/apis/credentials
+          google-guest:
+            provider: google
+            client-id: ${GOOGLE_CLIENT_ID:dummy-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dummy-google-client-secret}
+            scope: email,profile
           # 네이버는 표준 OIDC가 아니라서 provider 정보를 직접 지정해야 함.
           # https://developers.naver.com/apps 에서 발급, 콜백 URL은
           # {백엔드주소}/login/oauth2/code/naver

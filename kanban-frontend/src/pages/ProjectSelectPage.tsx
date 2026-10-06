@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { listProjects, type ProjectSummary } from "../lib/projects";
 import { roleLabel } from "../components/members/RoleCheckboxes";
 import { ApiError } from "../lib/api";
+import { getStoredUser } from "../lib/auth";
 import Button from "../components/ui/Button";
 import Logo from "../components/ui/Logo";
 import Pill from "../components/ui/Pill";
@@ -29,6 +30,9 @@ export default function ProjectSelectPage() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const { invitations, loading: invitationsLoading, accept, decline } = useInvitations();
+  // 게스트 계정은 프로젝트를 새로 만들 수 없고 초대받아 참여만 가능(서버에서도 403으로 막음) —
+  // "+ 새 프로젝트" 버튼 자체를 안 보여줘서 눌러도 에러나는 상황을 미리 피한다.
+  const isGuest = getStoredUser()?.isGuest ?? false;
 
   const loadProjects = () => {
     setLoading(true);
@@ -51,13 +55,15 @@ export default function ProjectSelectPage() {
       <nav className="flex w-full items-center justify-between bg-white px-[60px] py-[22px] shadow-[0px_2px_8px_rgba(0,0,0,0.04)]">
         <Logo textClassName="text-[16px] font-bold text-[#6366f1]" />
         <div className="flex items-center gap-3.5">
-          <Button
-            variant="primary"
-            onClick={() => setCreateOpen(true)}
-            className="px-[18px] py-[9px] text-[13.5px]"
-          >
-            + 새 프로젝트
-          </Button>
+          {!isGuest && (
+            <Button
+              variant="primary"
+              onClick={() => setCreateOpen(true)}
+              className="px-[18px] py-[9px] text-[13.5px]"
+            >
+              + 새 프로젝트
+            </Button>
+          )}
           <InvitationBell
             invitations={invitations}
             loading={invitationsLoading}
@@ -99,7 +105,11 @@ export default function ProjectSelectPage() {
 
         <div className="flex flex-col gap-1.5">
           <h1 className="text-[24px] font-bold text-[#111827]">내 프로젝트</h1>
-          <p className="text-[13.5px] text-[#6b7280]">최근에 작업한 프로젝트를 선택해서 이어가세요</p>
+          <p className="text-[13.5px] text-[#6b7280]">
+            {isGuest
+              ? "게스트 계정은 초대받은 프로젝트만 이용할 수 있어요. 관리자에게 초대를 요청해보세요."
+              : "최근에 작업한 프로젝트를 선택해서 이어가세요"}
+          </p>
         </div>
 
         {loading && <p className="text-[13.5px] text-[#9ca3af]">불러오는 중...</p>}
@@ -151,14 +161,16 @@ export default function ProjectSelectPage() {
               );
             })}
 
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="flex h-[244px] w-[320px] flex-col items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#e5e7eb] bg-white text-[#9ca3af] hover:border-[#6366f1] hover:text-[#6366f1]"
-            >
-              <span className="text-[28px] font-bold">+</span>
-              <span className="text-[13px] font-medium">새 프로젝트 만들기</span>
-            </button>
+            {!isGuest && (
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="flex h-[244px] w-[320px] flex-col items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#e5e7eb] bg-white text-[#9ca3af] hover:border-[#6366f1] hover:text-[#6366f1]"
+              >
+                <span className="text-[28px] font-bold">+</span>
+                <span className="text-[13px] font-medium">새 프로젝트 만들기</span>
+              </button>
+            )}
           </div>
         )}
       </div>
