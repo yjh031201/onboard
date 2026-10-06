@@ -9,6 +9,7 @@ import com.kanban.backend.board.dto.UpdateCardRequest;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
+import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
 import com.kanban.backend.timeline.TimelineEventType;
@@ -28,67 +29,73 @@ public class CardService {
     private final LabelRepository labelRepository;
     private final TimelineService timelineService;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final ProjectAccessService projectAccessService;
 
     public CardService(
             CardRepository cardRepository,
             BoardColumnRepository columnRepository,
             LabelRepository labelRepository,
             TimelineService timelineService,
-            RealtimeEventPublisher realtimeEventPublisher
+            RealtimeEventPublisher realtimeEventPublisher,
+            ProjectAccessService projectAccessService
     ) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
         this.labelRepository = labelRepository;
         this.timelineService = timelineService;
         this.realtimeEventPublisher = realtimeEventPublisher;
+        this.projectAccessService = projectAccessService;
     }
 
     @Transactional(readOnly = true)
-    public List<CardResponse> list() {
-        return cardRepository.findAllByOrderByStatusAscPositionAsc().stream()
-                .map(CardResponse::from)
-                .toList();
+    public List<CardResponse> list(Long projectId, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        return listInternal(projectId);
     }
 
     @Transactional
-    public CardResponse create(CreateCardRequest request, User actor) {
-        BoardColumn column = findColumn(request.status());
-        List<String> labelIds = validLabelIds(request.labelIds());
-        int position = cardRepository.findAllByStatusOrderByPositionAsc(column.getId()).size();
+    public CardResponse create(Long projectId, CreateCardRequest request, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        BoardColumn column = findColumn(projectId, request.status());
+        List<String> labelIds = validLabelIds(projectId, request.labelIds());
+        int position = cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, column.getId()).size();
         Card card = cardRepository.save(new Card(
-                request.title().trim(), column.getId(), position, labelIds, request.dueAt(), actor.getId(), actor.getName()
+                projectId, request.title().trim(), column.getId(), position, labelIds, request.dueAt(),
+                actor.getId(), actor.getName()
         ));
 
         timelineService.record(
+                projectId,
                 TimelineEventType.CARD_CREATED,
                 "%s님이 '%s' 카드를 %s에 추가했습니다".formatted(actor.getName(), card.getTitle(), column.getName()),
                 actor,
                 true
         );
-        broadcastSnapshot("CARD_CREATED", actor.getName());
+        broadcastSnapshot(projectId, "CARD_CREATED", actor.getName());
 
         return CardResponse.from(card);
     }
 
     @Transactional
-    public CardResponse move(Long cardId, MoveCardRequest request, User actor) {
-        Card card = cardRepository.findById(cardId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."));
+    public CardResponse move(Long projectId, Long cardId, MoveCardRequest request, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        Card card = findCard(projectId, cardId);
 
         String previousStatus = card.getStatus();
-        BoardColumn targetColumn = findColumn(request.status());
+        BoardColumn targetColumn = findColumn(projectId, request.status());
         String targetStatus = targetColumn.getId();
         boolean sameColumn = previousStatus.equals(targetStatus);
 
         if (sameColumn) {
-            reorderWithinColumn(card, targetStatus, request.position());
+            reorderWithinColumn(projectId, card, targetStatus, request.position());
         } else {
-            moveAcrossColumns(card, previousStatus, targetStatus, request.position());
+            moveAcrossColumns(projectId, card, previousStatus, targetStatus, request.position());
         }
 
         if (!sameColumn) {
             String previousName = columnRepository.findById(previousStatus).map(BoardColumn::getName).orElse(previousStatus);
             timelineService.record(
+                    projectId,
                     TimelineEventType.CARD_MOVED,
                     "%s님이 '%s' 카드를 %s → %s로 이동했습니다"
                             .formatted(actor.getName(), card.getTitle(), previousName, targetColumn.getName()),
@@ -96,35 +103,38 @@ public class CardService {
                     true
             );
         }
-        broadcastSnapshot("CARD_MOVED", actor.getName());
+        broadcastSnapshot(projectId, "CARD_MOVED", actor.getName());
 
         return CardResponse.from(card);
     }
 
     /** 제목·마감 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
     @Transactional
-    public CardResponse update(Long cardId, UpdateCardRequest request, User actor) {
-        Card card = findCard(cardId);
-        if (!card.isManageableBy(actor)) {
+    public CardResponse update(Long projectId, Long cardId, UpdateCardRequest request, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        Card card = findCard(projectId, cardId);
+        if (!isManageable(projectId, card, actor)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인이 만든 카드만 수정할 수 있습니다.");
         }
 
         card.update(request.title().trim(), request.dueAt());
         timelineService.record(
+                projectId,
                 TimelineEventType.CARD_UPDATED,
                 "%s님이 '%s' 카드를 수정했습니다".formatted(actor.getName(), card.getTitle()),
                 actor,
                 false
         );
-        broadcastSnapshot("CARD_UPDATED", actor.getName());
+        broadcastSnapshot(projectId, "CARD_UPDATED", actor.getName());
 
         return CardResponse.from(card);
     }
 
     @Transactional
-    public CardResponse changeLabels(Long cardId, ChangeCardLabelRequest request, User actor) {
-        Card card = findCard(cardId);
-        List<String> labelIds = validLabelIds(request.labelIds());
+    public CardResponse changeLabels(Long projectId, Long cardId, ChangeCardLabelRequest request, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        Card card = findCard(projectId, cardId);
+        List<String> labelIds = validLabelIds(projectId, request.labelIds());
         if (labelIds.equals(card.getLabelIds())) {
             return CardResponse.from(card);
         }
@@ -136,56 +146,81 @@ public class CardService {
                         .map(id -> labelRepository.findById(id).map(Label::getName).orElse(id))
                         .toList());
         timelineService.record(
+                projectId,
                 TimelineEventType.CARD_LABEL_CHANGED,
                 "%s님이 '%s' 카드의 라벨을 %s(으)로 바꿨습니다".formatted(actor.getName(), card.getTitle(), labelNames),
                 actor,
                 true
         );
-        broadcastSnapshot("CARD_LABEL_CHANGED", actor.getName());
+        broadcastSnapshot(projectId, "CARD_LABEL_CHANGED", actor.getName());
 
         return CardResponse.from(card);
     }
 
     /** 라벨이 삭제될 때 호출 — 그 라벨이 붙어 있던 카드들에서 떼어낸다. */
     @Transactional
-    public void clearLabel(String labelId, User actor) {
-        List<Card> cards = cardRepository.findAllWithLabel(labelId);
+    public void clearLabel(Long projectId, String labelId, User actor) {
+        List<Card> cards = cardRepository.findAllWithLabel(projectId, labelId);
         if (cards.isEmpty()) {
             return;
         }
         cards.forEach(card -> card.removeLabel(labelId));
-        broadcastSnapshot("CARD_LABEL_CHANGED", actor.getName());
+        broadcastSnapshot(projectId, "CARD_LABEL_CHANGED", actor.getName());
     }
 
     @Transactional
-    public void delete(Long cardId, User actor) {
-        Card card = findCard(cardId);
-        if (!card.isManageableBy(actor)) {
+    public void delete(Long projectId, Long cardId, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        Card card = findCard(projectId, cardId);
+        if (!isManageable(projectId, card, actor)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인이 만든 카드만 삭제할 수 있습니다.");
         }
 
         String status = card.getStatus();
         cardRepository.delete(card);
 
-        List<Card> column = new ArrayList<>(cardRepository.findAllByStatusOrderByPositionAsc(status));
+        List<Card> column = new ArrayList<>(cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, status));
         column.removeIf(c -> c.getId().equals(cardId));
         renumber(column);
 
-        broadcastSnapshot("CARD_DELETED", actor.getName());
+        broadcastSnapshot(projectId, "CARD_DELETED", actor.getName());
     }
 
-    private BoardColumn findColumn(String columnId) {
-        return columnRepository.findById(columnId)
+    /** 작성자 본인이거나, 이 프로젝트에서 OWNER/ADMIN이면 수정·삭제 가능. */
+    private boolean isManageable(Long projectId, Card card, User actor) {
+        if (card.getCreatedById().equals(actor.getId())) {
+            return true;
+        }
+        var role = projectAccessService.myRoleOrNull(projectId, actor.getId());
+        return role != null && role != com.kanban.backend.user.UserRole.MEMBER;
+    }
+
+    private List<CardResponse> listInternal(Long projectId) {
+        return cardRepository.findAllByProjectIdOrderByStatusAscPositionAsc(projectId).stream()
+                .map(CardResponse::from)
+                .toList();
+    }
+
+    private BoardColumn findColumn(Long projectId, String columnId) {
+        BoardColumn column = columnRepository.findById(columnId)
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "존재하지 않는 컬럼입니다."));
+        if (!column.getProjectId().equals(projectId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "존재하지 않는 컬럼입니다.");
+        }
+        return column;
     }
 
-    private Card findCard(Long cardId) {
-        return cardRepository.findById(cardId)
+    private Card findCard(Long projectId, Long cardId) {
+        Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."));
+        if (!card.getProjectId().equals(projectId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다.");
+        }
+        return card;
     }
 
     /** null은 라벨 없음. 중복은 합치고, 최대 개수와 존재 여부를 검사한다. */
-    private List<String> validLabelIds(List<String> requested) {
+    private List<String> validLabelIds(Long projectId, List<String> requested) {
         if (requested == null) {
             return List.of();
         }
@@ -194,15 +229,15 @@ public class CardService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "라벨은 최대 %d개까지 붙일 수 있습니다.".formatted(Card.MAX_LABELS));
         }
         for (String labelId : labelIds) {
-            if (labelId == null || !labelRepository.existsById(labelId)) {
+            if (labelId == null || !labelRepository.existsByIdAndProjectId(labelId, projectId)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "존재하지 않는 라벨입니다.");
             }
         }
         return labelIds;
     }
 
-    private void reorderWithinColumn(Card card, String status, int requestedPosition) {
-        List<Card> column = new ArrayList<>(cardRepository.findAllByStatusOrderByPositionAsc(status));
+    private void reorderWithinColumn(Long projectId, Card card, String status, int requestedPosition) {
+        List<Card> column = new ArrayList<>(cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, status));
         column.removeIf(c -> c.getId().equals(card.getId()));
 
         int targetIndex = clamp(requestedPosition, column.size());
@@ -210,12 +245,12 @@ public class CardService {
         renumber(column);
     }
 
-    private void moveAcrossColumns(Card card, String previousStatus, String targetStatus, int requestedPosition) {
-        List<Card> previousColumn = new ArrayList<>(cardRepository.findAllByStatusOrderByPositionAsc(previousStatus));
+    private void moveAcrossColumns(Long projectId, Card card, String previousStatus, String targetStatus, int requestedPosition) {
+        List<Card> previousColumn = new ArrayList<>(cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, previousStatus));
         previousColumn.removeIf(c -> c.getId().equals(card.getId()));
         renumber(previousColumn);
 
-        List<Card> targetColumn = new ArrayList<>(cardRepository.findAllByStatusOrderByPositionAsc(targetStatus));
+        List<Card> targetColumn = new ArrayList<>(cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, targetStatus));
         int targetIndex = clamp(requestedPosition, targetColumn.size());
         targetColumn.add(targetIndex, card);
 
@@ -233,8 +268,8 @@ public class CardService {
         return Math.max(0, Math.min(requested, size));
     }
 
-    private void broadcastSnapshot(String eventType, String actorName) {
-        BoardEvent event = new BoardEvent(eventType, list(), actorName);
-        realtimeEventPublisher.publish(RealtimeChannels.BOARD_EVENTS, event);
+    private void broadcastSnapshot(Long projectId, String eventType, String actorName) {
+        BoardEvent event = new BoardEvent(eventType, listInternal(projectId), actorName);
+        realtimeEventPublisher.publish(RealtimeChannels.boardEvents(projectId), event);
     }
 }

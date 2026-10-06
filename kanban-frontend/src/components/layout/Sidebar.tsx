@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import Logo from "../ui/Logo";
 
 interface NavItemDef {
   to: string;
@@ -34,9 +35,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         }`}
       >
         {!collapsed && (
-          <p className="whitespace-nowrap text-[17px] font-bold text-[#111827]">
-            📋 칸반보드
-          </p>
+          <Logo iconSize="size-7" textClassName="text-[17px] font-bold text-[#111827]" />
         )}
         <button
           type="button"

@@ -1,7 +1,5 @@
 package com.kanban.backend.board;
 
-import com.kanban.backend.user.User;
-import com.kanban.backend.user.UserRole;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -32,6 +30,9 @@ public class Card {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -68,6 +69,7 @@ public class Card {
     private LocalDateTime updatedAt;
 
     public Card(
+            Long projectId,
             String title,
             String status,
             int position,
@@ -76,6 +78,7 @@ public class Card {
             Long createdById,
             String createdByName
     ) {
+        this.projectId = projectId;
         this.title = title;
         this.status = status;
         this.position = position;
@@ -109,10 +112,6 @@ public class Card {
         this.dueAt = dueAt;
     }
 
-    /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정·삭제 가능. */
-    public boolean isManageableBy(User user) {
-        return createdById.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
-    }
 
     @jakarta.persistence.PrePersist
     protected void onCreate() {

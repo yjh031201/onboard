@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
@@ -13,6 +14,11 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
  * live Redis instance. The "test" profile is specifically the one that runs
  * without any external services (see KanbanBackendApplicationTests), so it
  * skips this the same way it swaps MySQL for H2.
+ *
+ * Board/label/column/timeline channels are now one-per-project
+ * ("realtime:projects:{id}:board" 등), so a single pattern subscription covers
+ * every project instead of registering a fixed channel list — see
+ * {@link RealtimeRedisSubscriber} for how the matching STOMP topic is derived.
  */
 @Configuration
 @Profile("!test")
@@ -25,12 +31,8 @@ public class RealtimeRedisConfig {
     ) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.BOARD_EVENTS));
+        container.addMessageListener(subscriber, new PatternTopic("realtime:projects:*"));
         container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.PRESENCE_EVENTS));
-        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.TIMELINE_EVENTS));
-        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.TIMELINE_DELETED_EVENTS));
-        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.LABEL_EVENTS));
-        container.addMessageListener(subscriber, new ChannelTopic(RealtimeChannels.COLUMN_EVENTS));
         return container;
     }
 }

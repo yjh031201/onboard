@@ -53,6 +53,10 @@ public class User {
     @Column(name = "provider_id", length = 255)
     private String providerId;
 
+    /** "게스트로 이용"으로 처음 가입한 계정이면 true — 프로젝트 생성은 막히고, 초대받아 멤버로만 참여 가능. */
+    @Column(name = "is_guest", nullable = false)
+    private boolean guest = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -81,6 +85,13 @@ public class User {
         this.providerId = providerId;
     }
 
+    /** "게스트로 이용" 진입점으로 신규 계정이 만들어질 때만 호출할 것 — 이미 있던 정회원 계정은 격하시키지 않는다. */
+    public void markAsGuest() {
+        this.guest = true;
+    }
+
+    // isGuest()는 클래스의 @Getter가 boolean 필드 guest에 대해 자동 생성해준다 (수동 정의하면 중복 메서드 에러).
+
     /** 비밀번호 재설정 전용 — 반드시 이미 인코딩된(BCrypt) 값을 넘길 것. */
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
@@ -90,11 +101,6 @@ public class User {
     public void changeProfile(String name, String phone) {
         this.name = name;
         this.phone = phone;
-    }
-
-    /** 팀원 권한 변경 시 사용 — OWNER/ADMIN만 호출 가능하도록 UserService에서 제한. */
-    public void changeRole(UserRole role) {
-        this.role = role;
     }
 
     @jakarta.persistence.PrePersist

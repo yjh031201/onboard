@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TimelineEventRepository extends JpaRepository<TimelineEvent, Long> {
 
-    List<TimelineEvent> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    List<TimelineEvent> findAllByProjectIdOrderByCreatedAtDesc(Long projectId, Pageable pageable);
 }

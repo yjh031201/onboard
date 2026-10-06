@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Button from "../components/ui/Button";
+import Logo from "../components/ui/Logo";
 
 interface FeatureCard {
   emoji: string;
@@ -18,7 +19,7 @@ export default function LandingPage() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa]">
       <nav className="flex w-full items-center justify-between bg-white px-[60px] py-[22px] shadow-[0px_2px_8px_rgba(0,0,0,0.04)]">
-        <p className="text-[16px] font-bold text-[#6366f1]">📋 칸반보드</p>
+        <Logo textClassName="text-[16px] font-bold text-[#6366f1]" />
         <div className="flex items-center gap-3.5">
           <Link to="/login" className="text-[14px] font-medium text-[#6b7280] hover:text-[#111827]">
             로그인
