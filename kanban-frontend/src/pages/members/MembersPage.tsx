@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import PageShell from "../../components/layout/PageShell";
 import Section, { Divider } from "../../components/ui/Section";
-import { Field } from "../../components/ui/Field";
 import Button from "../../components/ui/Button";
 import Avatar from "../../components/ui/Avatar";
 import Pill from "../../components/ui/Pill";
 import { ApiError } from "../../lib/api";
-import { listMembers } from "../../lib/user";
-import { getStoredUser, type AuthUser } from "../../lib/auth";
+import { getStoredUser } from "../../lib/auth";
+import { useProjectId } from "../../hooks/useProjectId";
+import { listProjectMembers, type ProjectMemberDto } from "../../lib/projectMembers";
 import InvitePopup from "../../components/members/InvitePopup";
 import RolePopup from "../../components/members/RolePopup";
 import { roleLabel } from "../../components/members/RoleCheckboxes";
@@ -37,47 +37,34 @@ const INTEGRATIONS: IntegrationRow[] = [
 ];
 
 export default function MembersPage() {
-  const [teamName, setTeamName] = useState("칸반보드 프로젝트팀");
+  const projectId = useProjectId();
   const currentUser = getStoredUser();
 
-  const [members, setMembers] = useState<AuthUser[]>([]);
+  const [members, setMembers] = useState<ProjectMemberDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<AuthUser | null>(null);
+  const [editingMember, setEditingMember] = useState<ProjectMemberDto | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    listMembers()
+    listProjectMembers(projectId)
       .then(setMembers)
       .catch((err) => setError(err instanceof ApiError ? err.message : "팀원 목록을 불러오지 못했어요."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [projectId]);
 
-  // OWNER/ADMIN만 구성원을 초대하거나 권한을 바꿀 수 있음 (서버에서도 동일하게 검증됨).
-  const canManageRoles = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  // OWNER/ADMIN만 구성원을 초대하거나 권한을 바꿀 수 있음 (서버에서도 동일하게 검증됨) — 이 프로젝트에서의 내 role로 판단한다.
+  const myMembership = members.find((m) => m.userId === currentUser?.id);
+  const canManageRoles = myMembership?.role === "OWNER" || myMembership?.role === "ADMIN";
 
-  const handleMemberUpdated = (updated: AuthUser) => {
-    setMembers((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
-  };
-
-  const handleMemberAdded = (added: AuthUser) => {
-    setMembers((prev) => {
-      const exists = prev.some((m) => m.id === added.id);
-      return exists ? prev.map((m) => (m.id === added.id ? added : m)) : [...prev, added];
-    });
+  const handleMemberUpdated = (updated: ProjectMemberDto) => {
+    setMembers((prev) => prev.map((m) => (m.userId === updated.userId ? updated : m)));
   };
 
   return (
     <PageShell title="팀원" subtitle="팀원을 초대하고 팀 정보를 관리하세요">
-      <Section title="일반" description="팀의 기본 정보를 관리하세요">
-        <Field label="팀 이름" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
-        <div className="flex w-full justify-end">
-          <Button variant="primary">변경사항 저장</Button>
-        </div>
-      </Section>
-
       <Section title="구성원 및 권한" description="이메일 또는 휴대폰번호로 팀원을 검색해서 추가하고 권한을 관리하세요">
         <div className="flex w-full items-center justify-between">
           <p className="text-[12.5px] font-medium text-[#6b7280]">총 {members.length}명</p>
@@ -99,7 +86,7 @@ export default function MembersPage() {
         {!loading &&
           !error &&
           members.map((member, i) => (
-            <div key={member.id} className="flex w-full flex-col gap-[18px]">
+            <div key={member.userId} className="flex w-full flex-col gap-[18px]">
               {i > 0 && <Divider />}
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -113,7 +100,7 @@ export default function MembersPage() {
                   <Pill bg={ROLE_PILL[member.role]?.bg ?? "#f3f4f6"} text={ROLE_PILL[member.role]?.text ?? "#6b7280"}>
                     {roleLabel(member.role)}
                   </Pill>
-                  {canManageRoles && member.id !== currentUser?.id && (
+                  {canManageRoles && member.userId !== currentUser?.id && (
                     <button
                       type="button"
                       onClick={() => setEditingMember(member)}
@@ -160,10 +147,15 @@ export default function MembersPage() {
         <Button variant="danger">팀 삭제</Button>
       </Section>
 
-      {inviteOpen && <InvitePopup onClose={() => setInviteOpen(false)} onAdded={handleMemberAdded} />}
+      {inviteOpen && <InvitePopup projectId={projectId} onClose={() => setInviteOpen(false)} />}
 
       {editingMember && (
-        <RolePopup member={editingMember} onClose={() => setEditingMember(null)} onUpdated={handleMemberUpdated} />
+        <RolePopup
+          projectId={projectId}
+          member={editingMember}
+          onClose={() => setEditingMember(null)}
+          onUpdated={handleMemberUpdated}
+        />
       )}
     </PageShell>
   );

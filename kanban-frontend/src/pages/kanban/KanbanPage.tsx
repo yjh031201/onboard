@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from "react";
 import PageShell from "../../components/layout/PageShell";
+import { useProjectId } from "../../hooks/useProjectId";
 import { useKanbanBoard } from "../../hooks/useKanbanBoard";
 import { useBoardColumns } from "../../hooks/useBoardColumns";
 import {
@@ -21,9 +22,10 @@ import { useLabels } from "../../hooks/useLabels";
 import type { CardStatus, TaskCard } from "../../types/dashboard";
 
 export default function KanbanPage() {
-  const { tasks, loading } = useKanbanBoard();
-  const { columns } = useBoardColumns();
-  const labels = useLabels();
+  const projectId = useProjectId();
+  const { tasks, loading } = useKanbanBoard(projectId);
+  const { columns } = useBoardColumns(projectId);
+  const labels = useLabels(projectId);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<CardStatus | null>(null);
   const [newTitle, setNewTitle] = useState("");
@@ -41,7 +43,7 @@ export default function KanbanPage() {
     setDraggingId(null);
     // 실제 반영은 서버 브로드캐스트(/topic/board)를 받아서 이루어진다 — 낙관적 업데이트 없이,
     // 다른 사람이 카드를 옮겼을 때와 동일한 경로로 내 화면도 갱신된다.
-    moveCard(draggingId, status, targetIndex).catch(() => {
+    moveCard(projectId, draggingId, status, targetIndex).catch(() => {
       // 실패해도 다음 board 스냅샷이 오면 다시 맞춰지므로 별도 롤백 처리는 하지 않는다.
     });
   };
@@ -57,19 +59,19 @@ export default function KanbanPage() {
     const labelIds = newLabelIds;
     cancelNewCard();
     if (!title) return;
-    createCard(title, status, labelIds).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
+    createCard(projectId, title, status, labelIds).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
   };
 
   const toggleCardLabel = (task: TaskCard, labelId: string) => {
     const next = toggleLabelId(task.labelIds, labelId);
     if (next === task.labelIds) return; // 이미 최대 개수
     // 이동과 마찬가지로 화면 반영은 board 스냅샷을 통해서만 한다.
-    changeCardLabels(task.id, next).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
+    changeCardLabels(projectId, task.id, next).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
   };
 
   const clearCardLabels = (task: TaskCard) => {
     setLabelEditingId(null);
-    changeCardLabels(task.id, []).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
+    changeCardLabels(projectId, task.id, []).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
   };
 
   return (
@@ -96,7 +98,14 @@ export default function KanbanPage() {
                 {loading && <p className="text-[12px] text-[#9ca3af]">불러오는 중...</p>}
                 {columnTasks.map((task) => {
                   if (editingId === task.id) {
-                    return <CardEditForm key={task.id} task={task} onDone={() => setEditingId(null)} />;
+                    return (
+                      <CardEditForm
+                        key={task.id}
+                        projectId={projectId}
+                        task={task}
+                        onDone={() => setEditingId(null)}
+                      />
+                    );
                   }
 
                   const cardLabels = findLabels(labels, task.labelIds);
@@ -143,7 +152,7 @@ export default function KanbanPage() {
                             type="button"
                             title="카드 삭제"
                             aria-label={`'${task.title}' 카드 삭제`}
-                            onClick={() => confirmAndDeleteCard(task)}
+                            onClick={() => confirmAndDeleteCard(projectId, task)}
                             className="flex size-5 shrink-0 items-center justify-center rounded text-[15px] leading-none text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#ef4444]"
                           >
                             ×
@@ -270,7 +279,15 @@ function toInputValue(dueAt: string | null): string {
 }
 
 /** 카드 제목·마감 수정 — 작성자 또는 관리자만 연다 (서버에서도 검사). */
-function CardEditForm({ task, onDone }: { task: TaskCard; onDone: () => void }) {
+function CardEditForm({
+  projectId,
+  task,
+  onDone,
+}: {
+  projectId: number;
+  task: TaskCard;
+  onDone: () => void;
+}) {
   const [title, setTitle] = useState(task.title);
   const [dueAt, setDueAt] = useState(toInputValue(task.dueAt));
   const [saving, setSaving] = useState(false);
@@ -279,7 +296,7 @@ function CardEditForm({ task, onDone }: { task: TaskCard; onDone: () => void }) 
     const trimmed = title.trim();
     if (!trimmed || saving) return;
     setSaving(true);
-    updateCard(task.id, trimmed, dueAt || null)
+    updateCard(projectId, task.id, trimmed, dueAt || null)
       .then(onDone)
       .catch((err) => {
         setSaving(false);

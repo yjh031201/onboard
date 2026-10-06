@@ -6,15 +6,22 @@ package com.kanban.backend.realtime;
  * WebSocket clients receive it — this is what lets card moves, presence and
  * timeline events sync across a multi-instance deployment.
  *
- * Board/label/column/timeline events are now per-project (멀티프로젝트 지원) — the
- * channel/topic name is built from the projectId so clients only hear about the
- * project they're currently looking at. Presence stays global (전체 접속자), since
- * "누가 지금 온라인인지"는 프로젝트 구분 없이 하나의 개념이다.
+ * Board/label/column/timeline/presence events are all per-project (멀티프로젝트 지원) —
+ * the channel/topic name is built from the projectId so clients only hear about the
+ * project they're currently looking at. Presence used to be global (전체 접속자) but
+ * that leaked other projects' members into a project's "팀원 현황" widget, so a user's
+ * online/offline change is now broadcast once per project they're actually a member of
+ * (PresenceService looks that membership up) instead of to one single global topic.
  */
 public final class RealtimeChannels {
 
-    public static final String PRESENCE_EVENTS = "realtime:presence";
-    public static final String PRESENCE_TOPIC = "/topic/presence";
+    public static String presenceEvents(Long projectId) {
+        return "realtime:projects:" + projectId + ":presence";
+    }
+
+    public static String presenceTopic(Long projectId) {
+        return "/topic/projects/" + projectId + "/presence";
+    }
 
     public static String boardEvents(Long projectId) {
         return "realtime:projects:" + projectId + ":board";

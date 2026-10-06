@@ -5,6 +5,7 @@ import NameColorForm, { type NameColorDraft } from "./NameColorForm";
 import { ApiError } from "../../lib/api";
 import { createColumn, deleteColumn, reorderColumns, updateColumn, type ColumnDef } from "../../lib/boardColumns";
 import { useBoardColumns } from "../../hooks/useBoardColumns";
+import { useProjectId } from "../../hooks/useProjectId";
 
 /**
  * 컬럼은 색을 고르지 않는다 — 새 컬럼은 이 중립 회색으로 저장되고(라벨 없는 카드의 점 색),
@@ -22,7 +23,8 @@ type EditingTarget = "new" | string | null;
  * 칸반보드/대시보드도 같은 브로드캐스트를 받아 바로 컬럼이 바뀐다.
  */
 export default function ColumnSettings() {
-  const { columns, loading } = useBoardColumns();
+  const projectId = useProjectId();
+  const { columns, loading } = useBoardColumns(projectId);
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [draft, setDraft] = useState<NameColorDraft>({ name: "", color: DEFAULT_COLUMN_COLOR });
   const [saving, setSaving] = useState(false);
@@ -57,9 +59,9 @@ export default function ColumnSettings() {
     setSaving(true);
     try {
       if (editing === "new") {
-        await createColumn(name, draft.color);
+        await createColumn(projectId, name, draft.color);
       } else if (editing) {
-        await updateColumn(editing, name, draft.color);
+        await updateColumn(projectId, editing, name, draft.color);
       }
       setEditing(null);
       setError(null);
@@ -73,7 +75,7 @@ export default function ColumnSettings() {
   const remove = (column: ColumnDef) => {
     if (!window.confirm(`'${column.name}' 컬럼을 삭제할까요?`)) return;
     // 카드가 남아 있으면 서버가 거절하고 이유를 돌려준다.
-    deleteColumn(column.id).catch((err) => {
+    deleteColumn(projectId, column.id).catch((err) => {
       window.alert(err instanceof ApiError ? err.message : "컬럼을 삭제하지 못했어요.");
     });
   };
@@ -84,7 +86,7 @@ export default function ColumnSettings() {
     const ids = columns.map((column) => column.id);
     const [moved] = ids.splice(from, 1);
     ids.splice(to, 0, moved);
-    reorderColumns(ids).catch((err) => {
+    reorderColumns(projectId, ids).catch((err) => {
       window.alert(err instanceof ApiError ? err.message : "컬럼 순서를 바꾸지 못했어요.");
     });
   };

@@ -5,13 +5,14 @@ import { useLabels } from "../../hooks/useLabels";
 import type { TaskCard } from "../../types/dashboard";
 
 interface KanbanBoardProps {
+  projectId: number;
   columns: ColumnDef[];
   tasks: TaskCard[];
   loading: boolean;
 }
 
-export default function KanbanBoard({ columns, tasks, loading }: KanbanBoardProps) {
-  const labels = useLabels();
+export default function KanbanBoard({ projectId, columns, tasks, loading }: KanbanBoardProps) {
+  const labels = useLabels(projectId);
 
   return (
     // min-w-0: flex 자식은 기본으로 내용 너비 밑으로 줄어들지 않아서, 컬럼이 많으면
@@ -54,7 +55,7 @@ export default function KanbanBoard({ columns, tasks, loading }: KanbanBoardProp
                           type="button"
                           title="카드 삭제"
                           aria-label={`'${task.title}' 카드 삭제`}
-                          onClick={() => confirmAndDeleteCard(task)}
+                          onClick={() => confirmAndDeleteCard(projectId, task)}
                           className="flex size-5 shrink-0 items-center justify-center rounded text-[15px] leading-none text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#ef4444]"
                         >
                           ×

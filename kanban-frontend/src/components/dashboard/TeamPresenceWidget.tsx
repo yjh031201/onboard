@@ -11,8 +11,12 @@ const STATUS_DOT_COLOR: Record<PresenceStatus, string> = {
   offline: "bg-[#b3b6bc]",
 };
 
-export default function TeamPresenceWidget() {
-  const members = useTeamPresence();
+interface TeamPresenceWidgetProps {
+  projectId: number;
+}
+
+export default function TeamPresenceWidget({ projectId }: TeamPresenceWidgetProps) {
+  const members = useTeamPresence(projectId);
   const onlineCount = members.filter((m) => m.status === "online").length;
 
   return (

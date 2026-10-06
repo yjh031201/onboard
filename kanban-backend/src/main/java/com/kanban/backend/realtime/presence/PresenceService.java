@@ -1,8 +1,12 @@
 package com.kanban.backend.realtime.presence;
 
+import com.kanban.backend.project.InviteStatus;
+import com.kanban.backend.project.ProjectMember;
+import com.kanban.backend.project.ProjectMemberRepository;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -11,6 +15,11 @@ import org.springframework.stereotype.Service;
  * Tracks who's currently connected, backed by Redis so it stays correct
  * across multiple backend instances and across a user having several tabs
  * open at once (a user only goes offline once their last session closes).
+ *
+ * "온라인인지 아닌지" 자체는 사용자 단위로 전역이지만(여러 탭/여러 프로젝트를 동시에 봐도 한 사람),
+ * 그 변화를 알려주는 건 그 사람이 속한 프로젝트들에만 해야 한다 — 그래서 온/오프라인 전환이
+ * 생기면 ProjectMemberRepository로 그 사람이 (수락해서) 속한 프로젝트를 전부 찾아서 각각의
+ * 프로젝트 presence 토픽에 따로 쏴 준다.
  */
 @Service
 public class PresenceService {
@@ -21,10 +30,16 @@ public class PresenceService {
 
     private final StringRedisTemplate redisTemplate;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final ProjectMemberRepository projectMemberRepository;
 
-    public PresenceService(StringRedisTemplate redisTemplate, RealtimeEventPublisher realtimeEventPublisher) {
+    public PresenceService(
+            StringRedisTemplate redisTemplate,
+            RealtimeEventPublisher realtimeEventPublisher,
+            ProjectMemberRepository projectMemberRepository
+    ) {
         this.redisTemplate = redisTemplate;
         this.realtimeEventPublisher = realtimeEventPublisher;
+        this.projectMemberRepository = projectMemberRepository;
     }
 
     public void connect(String sessionId, Long userId, String userName) {
@@ -35,7 +50,7 @@ public class PresenceService {
         Long sessionCount = redisTemplate.opsForHash().increment(REFCOUNT_KEY, userIdKey, 1);
 
         if (sessionCount != null && sessionCount == 1L) {
-            broadcast(new PresenceEvent(userId, userName, PresenceStatus.ONLINE));
+            broadcastToMyProjects(new PresenceEvent(userId, userName, PresenceStatus.ONLINE));
         }
     }
 
@@ -51,7 +66,7 @@ public class PresenceService {
         if (sessionCount != null && sessionCount <= 0) {
             redisTemplate.opsForHash().delete(REFCOUNT_KEY, userIdKey);
             Object userName = redisTemplate.opsForHash().get(NAMES_KEY, userIdKey);
-            broadcast(new PresenceEvent(
+            broadcastToMyProjects(new PresenceEvent(
                     Long.valueOf(userIdKey),
                     userName == null ? null : userName.toString(),
                     PresenceStatus.OFFLINE
@@ -68,7 +83,10 @@ public class PresenceService {
         return onlineIds;
     }
 
-    private void broadcast(PresenceEvent event) {
-        realtimeEventPublisher.publish(RealtimeChannels.PRESENCE_EVENTS, event);
+    private void broadcastToMyProjects(PresenceEvent event) {
+        List<ProjectMember> memberships = projectMemberRepository.findAllByUserIdAndStatus(event.userId(), InviteStatus.ACCEPTED);
+        for (ProjectMember membership : memberships) {
+            realtimeEventPublisher.publish(RealtimeChannels.presenceEvents(membership.getProjectId()), event);
+        }
     }
 }

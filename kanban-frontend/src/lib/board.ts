@@ -1,4 +1,5 @@
-// 칸반 카드 REST API. 실시간 반영은 subscribeTopic("/topic/board", ...)로 별도 처리한다 (realtime.ts).
+// 칸반 카드 REST API. 실시간 반영은 subscribeTopic(`/topic/projects/${projectId}/board`, ...)로 별도 처리한다 (realtime.ts).
+// 카드는 프로젝트별로 나뉘어 있어서 모든 호출에 projectId가 필요하다.
 
 import { ApiError, apiRequest } from "./api";
 import { getStoredUser } from "./auth";
@@ -55,43 +56,58 @@ export function toTaskCards(dtos: CardDto[]): TaskCard[] {
   return dtos.map(toTaskCard);
 }
 
-export function fetchCards(): Promise<TaskCard[]> {
-  return apiRequest<CardDto[]>("/api/cards").then(toTaskCards);
+export function fetchCards(projectId: number): Promise<TaskCard[]> {
+  return apiRequest<CardDto[]>(`/api/projects/${projectId}/cards`).then(toTaskCards);
 }
 
-export function createCard(title: string, status: CardStatus, labelIds: string[]): Promise<TaskCard> {
-  return apiRequest<CardDto>("/api/cards", {
+export function createCard(
+  projectId: number,
+  title: string,
+  status: CardStatus,
+  labelIds: string[],
+): Promise<TaskCard> {
+  return apiRequest<CardDto>(`/api/projects/${projectId}/cards`, {
     method: "POST",
     body: JSON.stringify({ title, status, labelIds }),
   }).then(toTaskCard);
 }
 
 /** 제목·마감 수정. dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
-export function updateCard(cardId: string, title: string, dueAt: string | null): Promise<TaskCard> {
-  return apiRequest<CardDto>(`/api/cards/${cardId}`, {
+export function updateCard(
+  projectId: number,
+  cardId: string,
+  title: string,
+  dueAt: string | null,
+): Promise<TaskCard> {
+  return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}`, {
     method: "PATCH",
     body: JSON.stringify({ title, dueAt }),
   }).then(toTaskCard);
 }
 
 /** position은 이동할 컬럼 내에서의 0-based 목표 인덱스. */
-export function moveCard(cardId: string, status: CardStatus, position: number): Promise<TaskCard> {
-  return apiRequest<CardDto>(`/api/cards/${cardId}/move`, {
+export function moveCard(
+  projectId: number,
+  cardId: string,
+  status: CardStatus,
+  position: number,
+): Promise<TaskCard> {
+  return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}/move`, {
     method: "PATCH",
     body: JSON.stringify({ status, position }),
   }).then(toTaskCard);
 }
 
 /** 카드의 라벨 전체를 바꾼다. 빈 배열이면 라벨을 모두 뗀다. */
-export function changeCardLabels(cardId: string, labelIds: string[]): Promise<TaskCard> {
-  return apiRequest<CardDto>(`/api/cards/${cardId}/label`, {
+export function changeCardLabels(projectId: number, cardId: string, labelIds: string[]): Promise<TaskCard> {
+  return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}/label`, {
     method: "PATCH",
     body: JSON.stringify({ labelIds }),
   }).then(toTaskCard);
 }
 
-export function deleteCard(cardId: string): Promise<void> {
-  return apiRequest<void>(`/api/cards/${cardId}`, { method: "DELETE" });
+export function deleteCard(projectId: number, cardId: string): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/cards/${cardId}`, { method: "DELETE" });
 }
 
 /** 작성자 본인이거나 OWNER/ADMIN만 수정·삭제 가능 (서버에서도 동일하게 검증됨). */
@@ -117,9 +133,9 @@ export function describeDue(dueAt: string): { text: string; overdue: boolean } {
 }
 
 /** 확인 창을 띄운 뒤 삭제한다. 화면 반영은 board 스냅샷을 통해서만 하고, 실패하면 이유를 알려준다. */
-export function confirmAndDeleteCard(task: TaskCard): void {
+export function confirmAndDeleteCard(projectId: number, task: TaskCard): void {
   if (!window.confirm(`'${task.title}' 카드를 삭제할까요?`)) return;
-  deleteCard(task.id).catch((err) => {
+  deleteCard(projectId, task.id).catch((err) => {
     window.alert(err instanceof ApiError ? err.message : "카드를 삭제하지 못했어요.");
   });
 }

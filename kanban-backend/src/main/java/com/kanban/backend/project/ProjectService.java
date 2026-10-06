@@ -39,10 +39,10 @@ public class ProjectService {
         this.labelRepository = labelRepository;
     }
 
-    /** 내가 멤버인 프로젝트 목록. */
+    /** 내가 (초대를 수락해서) 멤버인 프로젝트 목록 — 아직 수락 안 한 PENDING 초대는 여기 안 뜨고 /api/invitations에 뜬다. */
     @Transactional(readOnly = true)
     public List<ProjectResponse> listMine(User actor) {
-        return projectMemberRepository.findAllByUserId(actor.getId()).stream()
+        return projectMemberRepository.findAllByUserIdAndStatus(actor.getId(), InviteStatus.ACCEPTED).stream()
                 .map(member -> {
                     Project project = projectRepository.findById(member.getProjectId())
                             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다."));

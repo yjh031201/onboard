@@ -5,10 +5,10 @@ import { Field, TextareaField } from "../../components/ui/Field";
 import Button from "../../components/ui/Button";
 import Toggle from "../../components/ui/Toggle";
 import { ApiError } from "../../lib/api";
-import { getStoredUser } from "../../lib/auth";
+import { useProjectId } from "../../hooks/useProjectId";
 import ColumnSettings from "../../components/settings/ColumnSettings";
 import LabelSettings from "../../components/settings/LabelSettings";
-import { getProjectSettings, updateProjectSettings } from "../../lib/settings";
+import { getProject, updateProject } from "../../lib/projects";
 import {
   getNotificationSettings,
   setNotificationSetting,
@@ -16,9 +16,9 @@ import {
 } from "../../lib/notificationSettings";
 
 export default function SettingsPage() {
-  const currentUser = getStoredUser();
-  // OWNER/ADMIN만 프로젝트 정보를 바꿀 수 있음 (서버에서도 동일하게 검증됨).
-  const canEditProject = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  const projectId = useProjectId();
+  // OWNER/ADMIN만 프로젝트 정보를 바꿀 수 있음 (서버에서도 동일하게 검증됨) — 이 프로젝트에서의 내 role로 판단한다.
+  const [canEditProject, setCanEditProject] = useState(false);
 
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
@@ -32,10 +32,11 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    getProjectSettings()
-      .then((settings) => {
-        setProjectName(settings.projectName);
-        setDescription(settings.description ?? "");
+    getProject(projectId)
+      .then((project) => {
+        setProjectName(project.name);
+        setDescription(project.description ?? "");
+        setCanEditProject(project.myRole === "OWNER" || project.myRole === "ADMIN");
       })
       .catch((err) =>
         setMessage({
@@ -44,7 +45,7 @@ export default function SettingsPage() {
         }),
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [projectId]);
 
   const handleSave = async () => {
     if (!projectName.trim()) {
@@ -54,8 +55,8 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const saved = await updateProjectSettings(projectName.trim(), description);
-      setProjectName(saved.projectName);
+      const saved = await updateProject(projectId, projectName.trim(), description);
+      setProjectName(saved.name);
       setDescription(saved.description ?? "");
       setMessage({ type: "success", text: "저장했어요." });
     } catch (err) {
