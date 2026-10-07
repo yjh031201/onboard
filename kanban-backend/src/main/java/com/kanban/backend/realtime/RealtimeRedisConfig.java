@@ -14,7 +14,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
  * without any external services (see KanbanBackendApplicationTests), so it
  * skips this the same way it swaps MySQL for H2.
  *
- * Board/label/column/timeline/presence channels are all one-per-project
+ * Board/label/column/timeline/presence/settings channels are all one-per-project
  * ("realtime:projects:{id}:board", "realtime:projects:{id}:presence" 등), so a
  * single pattern subscription covers every project and every channel kind
  * instead of registering a fixed channel list — see {@link RealtimeRedisSubscriber}

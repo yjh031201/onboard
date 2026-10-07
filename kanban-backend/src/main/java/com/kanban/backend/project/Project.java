@@ -31,6 +31,13 @@ public class Project {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    /** 보관 중이면 이 프로젝트 전체가 읽기 전용이 된다 (ArchiveGuardInterceptor). */
+    @Column(nullable = false)
+    private boolean archived;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -45,6 +52,16 @@ public class Project {
     public void update(String name, String description) {
         this.name = name;
         this.description = description;
+    }
+
+    public void archive() {
+        this.archived = true;
+        this.archivedAt = LocalDateTime.now();
+    }
+
+    public void unarchive() {
+        this.archived = false;
+        this.archivedAt = null;
     }
 
     @jakarta.persistence.PrePersist

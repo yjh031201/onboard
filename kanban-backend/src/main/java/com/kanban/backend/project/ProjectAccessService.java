@@ -37,6 +37,15 @@ public class ProjectAccessService {
         return member;
     }
 
+    /** 이 프로젝트에서 OWNER인지 확인 — 아니면 403. 프로젝트 삭제처럼 ADMIN도 할 수 없는 작업에 쓴다. */
+    public ProjectMember requireOwner(Long projectId, User user) {
+        ProjectMember member = requireMember(projectId, user);
+        if (member.getRole() != UserRole.OWNER) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "이 작업은 프로젝트의 소유자만 할 수 있습니다.");
+        }
+        return member;
+    }
+
     /** 이 프로젝트에서 내 role — (수락한) 멤버가 아니면 null (화면 표시용, 예외를 던지지 않음). */
     public UserRole myRoleOrNull(Long projectId, Long userId) {
         return projectMemberRepository.findByProjectIdAndUserIdAndStatus(projectId, userId, InviteStatus.ACCEPTED)

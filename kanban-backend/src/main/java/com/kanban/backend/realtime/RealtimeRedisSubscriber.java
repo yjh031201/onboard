@@ -17,11 +17,11 @@ import org.springframework.stereotype.Component;
  * STOMP topic, for whichever WebSocket clients happen to be connected to
  * this instance. This is the read side of the Redis pub-sub backplane.
  *
- * Board/label/column/timeline/presence channels are all per-project
+ * Board/label/column/timeline/presence/settings channels are all per-project
  * ("realtime:projects:{id}:board" -> "/topic/projects/{id}/board", and the
- * same for presence), so the topic is derived from the channel name instead
- * of a fixed lookup table — see {@link RealtimeRedisConfig} for the matching
- * pattern subscription.
+ * same for presence/settings), so the topic is derived from the channel name
+ * instead of a fixed lookup table — see {@link RealtimeRedisConfig} for the
+ * matching pattern subscription.
  */
 @Component
 public class RealtimeRedisSubscriber implements MessageListener {
@@ -60,7 +60,7 @@ public class RealtimeRedisSubscriber implements MessageListener {
             return null;
         }
         String projectId = matcher.group(1);
-        String suffix = matcher.group(2); // board | labels | columns | timeline | timeline-deleted | presence
+        String suffix = matcher.group(2); // board | labels | columns | timeline | timeline-deleted | presence | settings
         return "/topic/projects/" + projectId + "/" + suffix;
     }
 }

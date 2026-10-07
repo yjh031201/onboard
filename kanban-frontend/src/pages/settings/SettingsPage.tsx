@@ -8,7 +8,14 @@ import { ApiError } from "../../lib/api";
 import { useProjectId } from "../../hooks/useProjectId";
 import ColumnSettings from "../../components/settings/ColumnSettings";
 import LabelSettings from "../../components/settings/LabelSettings";
-import { getProject, updateProject } from "../../lib/projects";
+import {
+  archiveProject,
+  deleteProject,
+  getProject,
+  subscribeProjectSettings,
+  unarchiveProject,
+  updateProject,
+} from "../../lib/projects";
 import {
   getNotificationSettings,
   setNotificationSetting,
@@ -19,12 +26,19 @@ export default function SettingsPage() {
   const projectId = useProjectId();
   // OWNER/ADMIN만 프로젝트 정보를 바꿀 수 있음 (서버에서도 동일하게 검증됨) — 이 프로젝트에서의 내 role로 판단한다.
   const [canEditProject, setCanEditProject] = useState(false);
+  // 프로젝트 삭제는 OWNER만 (서버에서도 동일하게 검증됨).
+  const [canDeleteProject, setCanDeleteProject] = useState(false);
 
   const [projectName, setProjectName] = useState("");
+  // 서버에 저장된 이름 — 삭제 확인에 쓴다 (입력칸의 projectName은 저장 전 수정 중인 값일 수 있다).
+  const [savedProjectName, setSavedProjectName] = useState("");
   const [description, setDescription] = useState("");
+  const [archived, setArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [managing, setManaging] = useState(false);
+  const [manageError, setManageError] = useState<string | null>(null);
   const [notifSettings, setNotifSettings] = useState(getNotificationSettings);
 
   const updateNotifSetting = (key: keyof NotificationSettings, value: boolean) => {
@@ -35,8 +49,11 @@ export default function SettingsPage() {
     getProject(projectId)
       .then((project) => {
         setProjectName(project.name);
+        setSavedProjectName(project.name);
         setDescription(project.description ?? "");
+        setArchived(project.archived);
         setCanEditProject(project.myRole === "OWNER" || project.myRole === "ADMIN");
+        setCanDeleteProject(project.myRole === "OWNER");
       })
       .catch((err) =>
         setMessage({
@@ -45,7 +62,56 @@ export default function SettingsPage() {
         }),
       )
       .finally(() => setLoading(false));
+
+    // 다른 관리자가 보관하거나 보관을 풀어도, 이름을 바꿔도 바로 반영한다.
+    return subscribeProjectSettings(projectId, (project) => {
+      setArchived(project.archived);
+      setSavedProjectName(project.name);
+    });
   }, [projectId]);
+
+  const handleToggleArchive = async () => {
+    const question = archived
+      ? "프로젝트 보관을 해제할까요?\n다시 카드와 일정, 파일을 수정할 수 있게 돼요."
+      : "프로젝트를 보관할까요?\n보관을 해제할 때까지 모든 팀원에게 읽기 전용이 돼요.";
+    if (!window.confirm(question)) return;
+
+    setManaging(true);
+    setManageError(null);
+    try {
+      const saved = await (archived ? unarchiveProject(projectId) : archiveProject(projectId));
+      setArchived(saved.archived);
+    } catch (err) {
+      setManageError(err instanceof ApiError ? err.message : "프로젝트 보관 상태를 바꾸지 못했어요.");
+    } finally {
+      setManaging(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    // 되돌릴 수 없는 작업이라 실수로 누른 것이 아닌지, 프로젝트 이름을 직접 입력받아 확인한다.
+    const confirmText = savedProjectName.trim() || "삭제";
+    const typed = window.prompt(
+      "이 프로젝트의 모든 카드, 컬럼, 라벨, 활동 기록, 팀원 구성이 영구적으로 삭제되며 되돌릴 수 없어요.\n\n" +
+        `계속하려면 "${confirmText}"을(를) 입력하세요.`,
+    );
+    if (typed === null) return;
+    if (typed.trim() !== confirmText) {
+      setManageError("입력한 내용이 일치하지 않아 삭제하지 않았어요.");
+      return;
+    }
+
+    setManaging(true);
+    setManageError(null);
+    try {
+      await deleteProject(projectId);
+      window.alert("프로젝트를 삭제했어요.");
+      window.location.assign("/");
+    } catch (err) {
+      setManageError(err instanceof ApiError ? err.message : "프로젝트를 삭제하지 못했어요.");
+      setManaging(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!projectName.trim()) {
@@ -57,6 +123,7 @@ export default function SettingsPage() {
     try {
       const saved = await updateProject(projectId, projectName.trim(), description);
       setProjectName(saved.name);
+      setSavedProjectName(saved.name);
       setDescription(saved.description ?? "");
       setMessage({ type: "success", text: "저장했어요." });
     } catch (err) {
@@ -76,7 +143,7 @@ export default function SettingsPage() {
           label="프로젝트 이름"
           placeholder={loading ? "불러오는 중..." : "프로젝트 이름을 입력하세요"}
           maxLength={100}
-          disabled={loading || !canEditProject}
+          disabled={loading || !canEditProject || archived}
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
         />
@@ -84,7 +151,7 @@ export default function SettingsPage() {
           label="설명"
           rows={2}
           maxLength={2000}
-          disabled={loading || !canEditProject}
+          disabled={loading || !canEditProject || archived}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -95,12 +162,16 @@ export default function SettingsPage() {
             }`}
           >
             {message?.text ??
-              (canEditProject ? "" : "프로젝트 정보는 소유자/관리자만 변경할 수 있어요.")}
+              (!canEditProject
+                ? "프로젝트 정보는 소유자/관리자만 변경할 수 있어요."
+                : archived
+                  ? "보관된 프로젝트는 읽기 전용이에요."
+                  : "")}
           </p>
           {canEditProject && (
             <Button
               variant="primary"
-              disabled={loading || saving}
+              disabled={loading || saving || archived}
               onClick={handleSave}
               className="shrink-0 disabled:opacity-60"
             >
@@ -171,21 +242,44 @@ export default function SettingsPage() {
       >
         <div className="flex w-full items-center justify-between">
           <div className="flex flex-col gap-[3px]">
-            <p className="text-[13.5px] font-medium text-[#111827]">프로젝트 보관</p>
-            <p className="text-[12px] text-[#6b7280]">읽기 전용으로 전환되며 언제든 복구할 수 있어요</p>
+            <p className="text-[13.5px] font-medium text-[#111827]">
+              {archived ? "프로젝트 보관 해제" : "프로젝트 보관"}
+            </p>
+            <p className="text-[12px] text-[#6b7280]">
+              {archived
+                ? "지금은 보관 중이라 읽기 전용이에요. 해제하면 다시 수정할 수 있어요"
+                : "읽기 전용으로 전환되며 언제든 복구할 수 있어요"}
+            </p>
           </div>
-          <Button variant="secondary">보관하기</Button>
+          <Button
+            variant="secondary"
+            disabled={loading || managing || !canEditProject}
+            title={canEditProject ? undefined : "소유자/관리자만 할 수 있어요"}
+            onClick={handleToggleArchive}
+            className="shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {archived ? "보관 해제" : "보관하기"}
+          </Button>
         </div>
         <Divider />
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full items-center justify-between gap-3">
           <div className="flex flex-col gap-[3px]">
             <p className="text-[13.5px] font-medium text-[#111827]">프로젝트 삭제</p>
             <p className="text-[12px] text-[#6b7280]">
-              모든 카드와 데이터가 영구적으로 삭제되며 되돌릴 수 없어요
+              이 프로젝트의 카드·컬럼·라벨·활동 기록·팀원 구성이 영구적으로 삭제되며 되돌릴 수 없어요
             </p>
           </div>
-          <Button variant="danger">프로젝트 삭제</Button>
+          <Button
+            variant="danger"
+            disabled={loading || managing || !canDeleteProject}
+            title={canDeleteProject ? undefined : "소유자만 삭제할 수 있어요"}
+            onClick={handleDeleteProject}
+            className="shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            프로젝트 삭제
+          </Button>
         </div>
+        {manageError && <p className="text-[12.5px] text-[#ef4444]">{manageError}</p>}
       </Section>
     </PageShell>
   );

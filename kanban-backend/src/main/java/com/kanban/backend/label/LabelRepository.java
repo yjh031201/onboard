@@ -7,5 +7,7 @@ public interface LabelRepository extends JpaRepository<Label, String> {
 
     List<Label> findAllByProjectIdOrderByPositionAsc(Long projectId);
 
+    void deleteAllByProjectId(Long projectId);
+
     boolean existsByIdAndProjectId(String id, Long projectId);
 }

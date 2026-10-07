@@ -2,12 +2,16 @@ package com.kanban.backend.project;
 
 import com.kanban.backend.board.BoardColumn;
 import com.kanban.backend.board.BoardColumnRepository;
+import com.kanban.backend.board.CardRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
 import com.kanban.backend.project.dto.CreateProjectRequest;
 import com.kanban.backend.project.dto.ProjectResponse;
 import com.kanban.backend.project.dto.UpdateProjectRequest;
+import com.kanban.backend.realtime.RealtimeChannels;
+import com.kanban.backend.realtime.RealtimeEventPublisher;
+import com.kanban.backend.timeline.TimelineEventRepository;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
 import java.util.List;
@@ -24,19 +28,28 @@ public class ProjectService {
     private final ProjectAccessService projectAccessService;
     private final BoardColumnRepository boardColumnRepository;
     private final LabelRepository labelRepository;
+    private final CardRepository cardRepository;
+    private final TimelineEventRepository timelineEventRepository;
+    private final RealtimeEventPublisher realtimeEventPublisher;
 
     public ProjectService(
             ProjectRepository projectRepository,
             ProjectMemberRepository projectMemberRepository,
             ProjectAccessService projectAccessService,
             BoardColumnRepository boardColumnRepository,
-            LabelRepository labelRepository
+            LabelRepository labelRepository,
+            CardRepository cardRepository,
+            TimelineEventRepository timelineEventRepository,
+            RealtimeEventPublisher realtimeEventPublisher
     ) {
         this.projectRepository = projectRepository;
         this.projectMemberRepository = projectMemberRepository;
         this.projectAccessService = projectAccessService;
         this.boardColumnRepository = boardColumnRepository;
         this.labelRepository = labelRepository;
+        this.cardRepository = cardRepository;
+        this.timelineEventRepository = timelineEventRepository;
+        this.realtimeEventPublisher = realtimeEventPublisher;
     }
 
     /** 내가 (초대를 수락해서) 멤버인 프로젝트 목록 — 아직 수락 안 한 PENDING 초대는 여기 안 뜨고 /api/invitations에 뜬다. */
@@ -79,10 +92,52 @@ public class ProjectService {
     @Transactional
     public ProjectResponse update(Long projectId, UpdateProjectRequest request, User actor) {
         Project project = findOrThrow(projectId);
-        projectAccessService.requireAdmin(projectId, actor);
+        ProjectMember member = projectAccessService.requireAdmin(projectId, actor);
 
         project.update(request.name().trim(), request.description());
-        return ProjectResponse.from(project, projectAccessService.myRoleOrNull(projectId, actor.getId()));
+        ProjectResponse response = ProjectResponse.from(project, member.getRole());
+        realtimeEventPublisher.publish(RealtimeChannels.settingsEvents(projectId), response);
+        return response;
+    }
+
+    /** 프로젝트를 읽기 전용으로 전환 — OWNER/ADMIN만, ArchiveGuardInterceptor가 실제로 쓰기를 막는다. */
+    @Transactional
+    public ProjectResponse archive(Long projectId, User actor) {
+        Project project = findOrThrow(projectId);
+        ProjectMember member = projectAccessService.requireAdmin(projectId, actor);
+
+        project.archive();
+        ProjectResponse response = ProjectResponse.from(project, member.getRole());
+        realtimeEventPublisher.publish(RealtimeChannels.settingsEvents(projectId), response);
+        return response;
+    }
+
+    @Transactional
+    public ProjectResponse unarchive(Long projectId, User actor) {
+        Project project = findOrThrow(projectId);
+        ProjectMember member = projectAccessService.requireAdmin(projectId, actor);
+
+        project.unarchive();
+        ProjectResponse response = ProjectResponse.from(project, member.getRole());
+        realtimeEventPublisher.publish(RealtimeChannels.settingsEvents(projectId), response);
+        return response;
+    }
+
+    /**
+     * 프로젝트를 영구 삭제 — OWNER만. 이 프로젝트의 카드(+라벨 연결)·컬럼·라벨·타임라인·멤버십을 전부 지우고
+     * 프로젝트 자체를 삭제한다. 일정·파일은 아직 프로젝트별로 나뉘어 있지 않아(전역) 건드리지 않는다.
+     */
+    @Transactional
+    public void delete(Long projectId, User actor) {
+        findOrThrow(projectId);
+        projectAccessService.requireOwner(projectId, actor);
+
+        cardRepository.deleteAllByProjectId(projectId);
+        boardColumnRepository.deleteAllByProjectId(projectId);
+        labelRepository.deleteAllByProjectId(projectId);
+        timelineEventRepository.deleteAllByProjectId(projectId);
+        projectMemberRepository.deleteAllByProjectId(projectId);
+        projectRepository.deleteById(projectId);
     }
 
     /** 새 프로젝트에 기본 컬럼 3개 + 기본 라벨 5개를 넣는다 — V11/V12 마이그레이션의 기본값과 동일. */

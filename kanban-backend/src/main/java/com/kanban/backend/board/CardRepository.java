@@ -9,6 +9,8 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     List<Card> findAllByProjectIdOrderByStatusAscPositionAsc(Long projectId);
 
+    void deleteAllByProjectId(Long projectId);
+
     List<Card> findAllByProjectIdAndStatusOrderByPositionAsc(Long projectId, String status);
 
     boolean existsByProjectIdAndStatus(Long projectId, String status);

@@ -205,10 +205,6 @@ export default function MembersPage() {
         })}
       </Section>
 
-      <Section title="팀 삭제" description="팀과 관련된 모든 데이터가 영구적으로 삭제되며 이 작업은 되돌릴 수 없습니다." danger>
-        <Button variant="danger">팀 삭제</Button>
-      </Section>
-
       {inviteOpen && <InvitePopup projectId={projectId} onClose={() => setInviteOpen(false)} />}
 
       {editingMember && (

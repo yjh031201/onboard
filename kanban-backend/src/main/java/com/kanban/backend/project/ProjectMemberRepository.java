@@ -19,4 +19,6 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     List<ProjectMember> findAllByUserIdAndStatus(Long userId, InviteStatus status);
 
     boolean existsByProjectIdAndUserId(Long projectId, Long userId);
+
+    void deleteAllByProjectId(Long projectId);
 }

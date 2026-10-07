@@ -5,6 +5,7 @@ import com.kanban.backend.integration.slack.SlackIntegrationService;
 import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
+import com.kanban.backend.timeline.dto.TimelineEventDeleted;
 import com.kanban.backend.timeline.dto.TimelineEventResponse;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
