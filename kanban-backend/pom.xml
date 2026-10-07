@@ -36,6 +36,16 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-oauth2-client</artifactId>
     </dependency>
+
+    <!-- 로컬 개발용 .env 자동 로딩 — mvnw/IntelliJ로 바로 실행할 때 kanban-backend/.env를
+         읽어서 환경변수처럼 꽂아준다(docker-compose.prod.yml은 이거 없이도 .env를 자체적으로
+         읽으니 배포 쪽엔 영향 없음). kanban-backend/.env는 루트 .gitignore의 ".env" 패턴에
+         이미 걸려서 커밋 안 됨 — GOOGLE_CLIENT_ID/SECRET 같은 비밀값을 여기 넣으면 됨. -->
+    <dependency>
+      <groupId>me.paulschwarz</groupId>
+      <artifactId>spring-dotenv</artifactId>
+      <version>4.0.0</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -68,10 +78,6 @@
       <artifactId>flyway-mysql</artifactId>
     </dependency>
 
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-data-redis</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.redisson</groupId>
       <artifactId>redisson-spring-boot-starter</artifactId>

@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 카드 라벨 관리 — 팀원 누구나 추가/편집/삭제할 수 있다. */
+/** 카드 라벨 관리 — 이 프로젝트의 멤버 누구나 추가/편집/삭제할 수 있다. */
 @RestController
-@RequestMapping("/api/labels")
+@RequestMapping("/api/projects/{projectId}/labels")
 public class LabelController {
 
     private final LabelService labelService;
@@ -29,23 +29,36 @@ public class LabelController {
     }
 
     @GetMapping
-    public ResponseEntity<List<LabelResponse>> list() {
-        return ResponseEntity.ok(labelService.list());
+    public ResponseEntity<List<LabelResponse>> list(@PathVariable Long projectId, @AuthenticationPrincipal User actor) {
+        return ResponseEntity.ok(labelService.list(projectId, actor));
     }
 
     @PostMapping
-    public ResponseEntity<LabelResponse> create(@Valid @RequestBody LabelRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(labelService.create(request));
+    public ResponseEntity<LabelResponse> create(
+            @PathVariable Long projectId,
+            @Valid @RequestBody LabelRequest request,
+            @AuthenticationPrincipal User actor
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(labelService.create(projectId, request, actor));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<LabelResponse> update(@PathVariable String id, @Valid @RequestBody LabelRequest request) {
-        return ResponseEntity.ok(labelService.update(id, request));
+    public ResponseEntity<LabelResponse> update(
+            @PathVariable Long projectId,
+            @PathVariable String id,
+            @Valid @RequestBody LabelRequest request,
+            @AuthenticationPrincipal User actor
+    ) {
+        return ResponseEntity.ok(labelService.update(projectId, id, request, actor));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable String id, @AuthenticationPrincipal User actor) {
-        labelService.delete(id, actor);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long projectId,
+            @PathVariable String id,
+            @AuthenticationPrincipal User actor
+    ) {
+        labelService.delete(projectId, id, actor);
         return ResponseEntity.noContent().build();
     }
 }

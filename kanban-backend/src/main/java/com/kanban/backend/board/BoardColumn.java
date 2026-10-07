@@ -20,6 +20,9 @@ public class BoardColumn {
     @Column(length = 20)
     private String id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Column(nullable = false, length = 30)
     private String name;
 
@@ -36,8 +39,9 @@ public class BoardColumn {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public BoardColumn(String id, String name, String color, int position) {
+    public BoardColumn(String id, Long projectId, String name, String color, int position) {
         this.id = id;
+        this.projectId = projectId;
         this.name = name;
         this.color = color;
         this.position = position;

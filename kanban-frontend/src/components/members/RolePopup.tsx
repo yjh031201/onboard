@@ -1,17 +1,17 @@
 import { useState } from "react";
 import Button from "../ui/Button";
 import { ApiError } from "../../lib/api";
-import { updateMemberRole } from "../../lib/user";
-import type { AuthUser } from "../../lib/auth";
+import { updateMemberRole, type ProjectMemberDto } from "../../lib/projectMembers";
 import RoleCheckboxes, { type Role } from "./RoleCheckboxes";
 
 interface RolePopupProps {
-  member: AuthUser;
+  projectId: number;
+  member: ProjectMemberDto;
   onClose: () => void;
-  onUpdated: (member: AuthUser) => void;
+  onUpdated: (member: ProjectMemberDto) => void;
 }
 
-export default function RolePopup({ member, onClose, onUpdated }: RolePopupProps) {
+export default function RolePopup({ projectId, member, onClose, onUpdated }: RolePopupProps) {
   const [role, setRole] = useState<Role>(member.role as Role);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +20,7 @@ export default function RolePopup({ member, onClose, onUpdated }: RolePopupProps
     setError(null);
     setSubmitting(true);
     try {
-      const updated = await updateMemberRole(member.id, role);
+      const updated = await updateMemberRole(projectId, member.userId, role);
       onUpdated(updated);
       onClose();
     } catch (err) {

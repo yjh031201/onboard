@@ -27,13 +27,15 @@ function App() {
 
       <Route path="/" element={<HomePage />} />
 
-      <Route element={<AppLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/kanban" element={<KanbanPage />} />
-        <Route path="/timeline" element={<TimelinePage />} />
-        <Route path="/members" element={<MembersPage />} />
-        <Route path="/files" element={<FilesPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+      {/* 한 사람이 여러 프로젝트를 가질 수 있어서, 보드/타임라인/팀원 등은 모두 특정 프로젝트 하위 경로다. */}
+      <Route path="/projects/:projectId" element={<AppLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="kanban" element={<KanbanPage />} />
+        <Route path="timeline" element={<TimelinePage />} />
+        <Route path="members" element={<MembersPage />} />
+        <Route path="files" element={<FilesPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

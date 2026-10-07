@@ -20,6 +20,9 @@ public class Label {
     @Column(length = 30)
     private String id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Column(nullable = false, length = 20)
     private String name;
 
@@ -36,8 +39,9 @@ public class Label {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Label(String id, String name, String color, int position) {
+    public Label(String id, Long projectId, String name, String color, int position) {
         this.id = id;
+        this.projectId = projectId;
         this.name = name;
         this.color = color;
         this.position = position;

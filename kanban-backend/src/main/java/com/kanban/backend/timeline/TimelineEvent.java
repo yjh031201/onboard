@@ -1,7 +1,5 @@
 package com.kanban.backend.timeline;
 
-import com.kanban.backend.user.User;
-import com.kanban.backend.user.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -30,6 +28,9 @@ public class TimelineEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private TimelineEventType type;
@@ -49,7 +50,8 @@ public class TimelineEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public TimelineEvent(TimelineEventType type, String message, Long actorId, String actorName, boolean notified) {
+    public TimelineEvent(Long projectId, TimelineEventType type, String message, Long actorId, String actorName, boolean notified) {
+        this.projectId = projectId;
         this.type = type;
         this.message = message;
         this.actorId = actorId;
@@ -57,10 +59,8 @@ public class TimelineEvent {
         this.notified = notified;
     }
 
-    /** 기록된 행동을 한 본인이거나 관리자(OWNER/ADMIN)면 삭제 가능. */
-    public boolean isDeletableBy(User user) {
-        return actorId.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
-    }
+    // isDeletableBy(User)는 프로젝트별 권한 체크로 바뀌어서 TimelineService.isManageable(...)로 이동했다
+    // (전역 User.role이 아니라 ProjectMember.role을 봐야 하기 때문).
 
     @jakarta.persistence.PrePersist
     protected void onCreate() {

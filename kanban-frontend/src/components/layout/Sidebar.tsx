@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useParams } from "react-router-dom";
+import Logo from "../ui/Logo";
 
 interface NavItemDef {
   to: string;
@@ -7,21 +8,24 @@ interface NavItemDef {
   end?: boolean;
 }
 
-const NAV_ITEMS: NavItemDef[] = [
-  { to: "/dashboard", label: "대시보드", icon: "🏠", end: true },
-  { to: "/kanban", label: "칸반보드", icon: "📌" },
-  { to: "/timeline", label: "타임라인", icon: "🕒" },
-  { to: "/members", label: "팀원", icon: "👥" },
-  { to: "/files", label: "파일", icon: "📁" },
-  { to: "/settings", label: "설정", icon: "⚙️" },
-];
-
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
 }
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const { projectId } = useParams<{ projectId: string }>();
+  const base = `/projects/${projectId}`;
+
+  const navItems: NavItemDef[] = [
+    { to: `${base}/dashboard`, label: "대시보드", icon: "🏠", end: true },
+    { to: `${base}/kanban`, label: "칸반보드", icon: "📌" },
+    { to: `${base}/timeline`, label: "타임라인", icon: "🕒" },
+    { to: `${base}/members`, label: "팀원", icon: "👥" },
+    { to: `${base}/files`, label: "파일", icon: "📁" },
+    { to: `${base}/settings`, label: "설정", icon: "⚙️" },
+  ];
+
   return (
     <div
       className={`sticky top-0 flex h-screen shrink-0 flex-col gap-7 border border-[#ececee] bg-white py-6 ${
@@ -34,9 +38,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         }`}
       >
         {!collapsed && (
-          <p className="whitespace-nowrap text-[17px] font-bold text-[#111827]">
-            📋 칸반보드
-          </p>
+          <Logo iconSize="size-7" textClassName="text-[17px] font-bold text-[#111827]" />
         )}
         <button
           type="button"
@@ -49,7 +51,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       <nav className="flex w-full flex-col gap-1">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
