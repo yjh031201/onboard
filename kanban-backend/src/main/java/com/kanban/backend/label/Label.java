@@ -16,6 +16,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Label {
 
+    /** 기본 "기타" 라벨 — 붙인 카드마다 글자를 직접 적을 수 있다(Card.customLabel). 그래서 삭제할 수 없다. */
+    public static final String ETC_ID = "etc";
+
     @Id
     @Column(length = 30)
     private String id;

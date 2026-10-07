@@ -10,6 +10,12 @@ export interface LabelDef {
   color: string;
 }
 
+/** 기본 "기타" 라벨의 id (서버 Label.ETC_ID와 같음) — 붙인 카드마다 글자를 직접 적을 수 있고, 삭제할 수 없다. */
+export const ETC_LABEL_ID = "etc";
+
+/** 라벨 이름·기타 라벨 직접 입력 글자 수 제한 (서버와 같음). */
+export const MAX_LABEL_NAME_LENGTH = 20;
+
 export function findLabel(labels: LabelDef[], id: string | null | undefined): LabelDef | undefined {
   return id ? labels.find((label) => label.id === id) : undefined;
 }
@@ -17,6 +23,16 @@ export function findLabel(labels: LabelDef[], id: string | null | undefined): La
 /** 카드에 붙은 라벨 id 목록 → 라벨 정의 (설정에서 지워져 못 찾는 id는 뺀다). */
 export function findLabels(labels: LabelDef[], ids: string[]): LabelDef[] {
   return ids.map((id) => findLabel(labels, id)).filter((label): label is LabelDef => label !== undefined);
+}
+
+/** 카드에 보여 줄 라벨 — "기타" 라벨에 직접 적은 글자가 있으면 이름 대신 그 글자를 보여 준다. */
+export function findCardLabels(
+  labels: LabelDef[],
+  card: { labelIds: string[]; customLabel: string | null },
+): LabelDef[] {
+  return findLabels(labels, card.labelIds).map((label) =>
+    label.id === ETC_LABEL_ID && card.customLabel ? { ...label, name: card.customLabel } : label,
+  );
 }
 
 export function fetchLabels(): Promise<LabelDef[]> {

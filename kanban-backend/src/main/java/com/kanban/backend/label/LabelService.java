@@ -59,6 +59,9 @@ public class LabelService {
     /** 라벨을 지우면 그 라벨이 붙어 있던 카드들은 라벨 없음으로 바뀐다. */
     @Transactional
     public void delete(String id, User actor) {
+        if (Label.ETC_ID.equals(id)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "기본 '기타' 라벨은 삭제할 수 없습니다.");
+        }
         Label label = findOrThrow(id);
         labelRepository.delete(label);
 

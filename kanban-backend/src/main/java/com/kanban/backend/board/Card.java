@@ -1,5 +1,6 @@
 package com.kanban.backend.board;
 
+import com.kanban.backend.label.Label;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
 import jakarta.persistence.CollectionTable;
@@ -55,6 +56,10 @@ public class Card {
     @Column(name = "label_id", length = 30, nullable = false)
     private List<String> labelIds = new ArrayList<>();
 
+    /** "기타" 라벨(Label.ETC_ID)에 직접 적은 글자. 기타 라벨이 안 붙어 있거나 안 적었으면 null. */
+    @Column(name = "custom_label", length = 20)
+    private String customLabel;
+
     /** 마감 일시. 없으면 null. */
     @Column(name = "due_at")
     private LocalDateTime dueAt;
@@ -76,6 +81,7 @@ public class Card {
             String status,
             int position,
             List<String> labelIds,
+            String customLabel,
             LocalDateTime dueAt,
             Long createdById,
             String createdByName
@@ -84,6 +90,7 @@ public class Card {
         this.status = status;
         this.position = position;
         this.labelIds = new ArrayList<>(labelIds);
+        this.customLabel = customLabel;
         this.dueAt = dueAt;
         this.createdById = createdById;
         this.createdByName = createdByName;
@@ -98,13 +105,17 @@ public class Card {
         this.position = position;
     }
 
-    public void changeLabels(List<String> labelIds) {
+    public void changeLabels(List<String> labelIds, String customLabel) {
         this.labelIds.clear();
         this.labelIds.addAll(labelIds);
+        this.customLabel = customLabel;
     }
 
     /** 라벨이 삭제됐을 때 — 붙어 있었으면 떼고 true. */
     public boolean removeLabel(String labelId) {
+        if (Label.ETC_ID.equals(labelId)) {
+            this.customLabel = null;
+        }
         return this.labelIds.remove(labelId);
     }
 

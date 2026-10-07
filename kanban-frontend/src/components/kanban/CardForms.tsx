@@ -10,7 +10,7 @@ import {
   updateCard,
 } from "../../lib/board";
 import type { ColumnDef } from "../../lib/boardColumns";
-import type { LabelDef } from "../../lib/labels";
+import { ETC_LABEL_ID, MAX_LABEL_NAME_LENGTH, type LabelDef } from "../../lib/labels";
 import type { TaskCard } from "../../types/dashboard";
 
 /**
@@ -100,8 +100,8 @@ function DueInputs({ id, date, time, onChange }: DueInputsProps) {
 
 interface NewCardFormProps {
   labels: LabelDef[];
-  /** dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
-  onSubmit: (title: string, labelIds: string[], dueAt: string | null) => void;
+  /** customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
+  onSubmit: (title: string, labelIds: string[], customLabel: string | null, dueAt: string | null) => void;
   onCancel: () => void;
 }
 
@@ -109,6 +109,7 @@ interface NewCardFormProps {
 export function NewCardForm({ labels, onSubmit, onCancel }: NewCardFormProps) {
   const [title, setTitle] = useState("");
   const [labelIds, setLabelIds] = useState<string[]>([]);
+  const [customLabel, setCustomLabel] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   // Enter로 닫히면서 blur가 한 번 더 불려도 카드가 두 장 생기지 않게 한다.
@@ -119,7 +120,7 @@ export function NewCardForm({ labels, onSubmit, onCancel }: NewCardFormProps) {
     if (closedRef.current) return;
     closedRef.current = true;
     const trimmed = title.trim();
-    if (submit && trimmed) onSubmit(trimmed, labelIds, toDueAt(dueDate, dueTime));
+    if (submit && trimmed) onSubmit(trimmed, labelIds, customLabel.trim() || null, toDueAt(dueDate, dueTime));
     else onCancel();
   };
 
@@ -159,6 +160,9 @@ export function NewCardForm({ labels, onSubmit, onCancel }: NewCardFormProps) {
           labels={labels}
           selectedIds={labelIds}
           onToggle={(labelId) => setLabelIds((prev) => toggleLabelId(prev, labelId))}
+          customLabel={customLabel}
+          onCustomLabelChange={setCustomLabel}
+          liveCustomLabel
         />
       </div>
       <DueInputs
@@ -317,38 +321,97 @@ interface LabelPickerProps {
   selectedIds: string[];
   /** 선택된 라벨을 다시 누르면 빠지고, 최대 개수를 넘으면 눌리지 않는다. */
   onToggle: (labelId: string) => void;
+  /** "기타" 라벨에 직접 적은 글자 (없으면 ""). */
+  customLabel: string;
+  onCustomLabelChange: (text: string) => void;
+  /** true면 글자를 칠 때마다, 아니면 Enter를 누르거나 입력칸을 벗어날 때 onCustomLabelChange를 부른다. */
+  liveCustomLabel?: boolean;
+}
+
+interface CustomLabelInputProps {
+  value: string;
+  live: boolean;
+  onChange: (text: string) => void;
+}
+
+/** "기타" 라벨을 골랐을 때 뜨는 직접 입력칸 — 적은 글자가 카드에 "기타" 대신 보인다. */
+function CustomLabelInput({ value, live, onChange }: CustomLabelInputProps) {
+  const [draft, setDraft] = useState(value);
+  // 다른 사람이 바꿨거나 내 저장이 반영되면 입력칸도 그 값으로 맞춘다.
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setDraft(value);
+  }
+
+  const commit = () => {
+    const text = draft.trim();
+    if (!live && text !== value) onChange(text);
+  };
+
+  return (
+    <input
+      autoFocus
+      type="text"
+      maxLength={MAX_LABEL_NAME_LENGTH}
+      value={live ? value : draft}
+      onChange={(e) => (live ? onChange(e.target.value) : setDraft(e.target.value))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (!live && e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur();
+      }}
+      // 카드 안에서 눌러도 카드를 고른 것(컬럼 이동 목록 열기)으로 치지 않는다.
+      onClick={(e) => e.stopPropagation()}
+      placeholder="기타 라벨 직접 입력"
+      aria-label="기타 라벨 직접 입력"
+      className="w-full rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[12px] text-[#111827] placeholder:text-[#9ca3af] focus:border-[#6366f1] focus:outline-none"
+    />
+  );
 }
 
 /** 설정 페이지 라벨 버튼 목록 — 새 카드 입력칸 아래와 기존 카드의 라벨 변경에서 같이 쓴다. */
-export function LabelPicker({ labels, selectedIds, onToggle }: LabelPickerProps) {
+export function LabelPicker({
+  labels,
+  selectedIds,
+  onToggle,
+  customLabel,
+  onCustomLabelChange,
+  liveCustomLabel = false,
+}: LabelPickerProps) {
   const full = selectedIds.length >= MAX_CARD_LABELS;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {labels.map((label) => {
-        const selected = selectedIds.includes(label.id);
-        const disabled = !selected && full;
-        return (
-          <button
-            key={label.id}
-            type="button"
-            aria-pressed={selected}
-            disabled={disabled}
-            title={disabled ? `라벨은 최대 ${MAX_CARD_LABELS}개까지 붙일 수 있어요` : undefined}
-            // mousedown 기본 동작을 막아 입력창 포커스를 유지한다 — 새 카드 입력칸은 blur되면 카드가 바로 생성되기 때문.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onToggle(label.id)}
-            // 선택되면 라벨 색으로 채우고, 아니면 테두리와 색 점만 보여준다.
-            className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-              selected ? "text-white" : "bg-white text-[#374151] hover:bg-[#f9fafb]"
-            }`}
-            style={selected ? { backgroundColor: label.color, borderColor: label.color } : { borderColor: "#e5e7eb" }}
-          >
-            {!selected && <span className="size-2 rounded-full" style={{ backgroundColor: label.color }} />}
-            {label.name}
-          </button>
-        );
-      })}
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {labels.map((label) => {
+          const selected = selectedIds.includes(label.id);
+          const disabled = !selected && full;
+          const hint = label.id === ETC_LABEL_ID ? "고르면 라벨 글자를 직접 적을 수 있어요" : undefined;
+          return (
+            <button
+              key={label.id}
+              type="button"
+              aria-pressed={selected}
+              disabled={disabled}
+              title={disabled ? `라벨은 최대 ${MAX_CARD_LABELS}개까지 붙일 수 있어요` : hint}
+              // mousedown 기본 동작을 막아 입력창 포커스를 유지한다 — 새 카드 입력칸은 blur되면 카드가 바로 생성되기 때문.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onToggle(label.id)}
+              // 선택되면 라벨 색으로 채우고, 아니면 테두리와 색 점만 보여준다.
+              className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                selected ? "text-white" : "bg-white text-[#374151] hover:bg-[#f9fafb]"
+              }`}
+              style={selected ? { backgroundColor: label.color, borderColor: label.color } : { borderColor: "#e5e7eb" }}
+            >
+              {!selected && <span className="size-2 rounded-full" style={{ backgroundColor: label.color }} />}
+              {label.name}
+            </button>
+          );
+        })}
+      </div>
+      {selectedIds.includes(ETC_LABEL_ID) && (
+        <CustomLabelInput value={customLabel} live={liveCustomLabel} onChange={onCustomLabelChange} />
+      )}
     </div>
   );
 }

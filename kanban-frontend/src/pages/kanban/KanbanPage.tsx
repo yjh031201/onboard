@@ -18,7 +18,7 @@ import { CardDescription, CardEditForm, ColumnPicker, LabelPicker, NewCardForm }
 import CardFilterBar from "../../components/kanban/CardFilterBar";
 import { getStoredUser } from "../../lib/auth";
 import { EMPTY_CARD_FILTER, isFilterActive, matchesFilter } from "../../lib/cardFilter";
-import { findLabels } from "../../lib/labels";
+import { findCardLabels } from "../../lib/labels";
 import { useLabels } from "../../hooks/useLabels";
 import type { CardStatus, TaskCard } from "../../types/dashboard";
 
@@ -54,16 +54,29 @@ export default function KanbanPage() {
     moveCard(draggingId, status, targetIndex).catch((err) => alertCardError(err, "카드를 옮기지 못했어요."));
   };
 
-  const submitNewCard = (status: CardStatus, title: string, labelIds: string[], dueAt: string | null) => {
+  const submitNewCard = (
+    status: CardStatus,
+    title: string,
+    labelIds: string[],
+    customLabel: string | null,
+    dueAt: string | null,
+  ) => {
     setAddingTo(null);
-    createCard(title, status, labelIds, dueAt).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
+    createCard(title, status, labelIds, customLabel, dueAt).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
   };
 
   const toggleCardLabel = (task: TaskCard, labelId: string) => {
     const next = toggleLabelId(task.labelIds, labelId);
     if (next === task.labelIds) return; // 이미 최대 개수
     // 이동과 마찬가지로 화면 반영은 board 스냅샷을 통해서만 한다.
-    changeCardLabels(task.id, next).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
+    changeCardLabels(task.id, next, task.customLabel).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
+  };
+
+  // "기타" 라벨에 직접 적은 글자를 저장한다. 비우면 라벨 이름(기타)이 다시 보인다.
+  const changeCustomLabel = (task: TaskCard, text: string) => {
+    changeCardLabels(task.id, task.labelIds, text || null).catch((err) =>
+      alertCardError(err, "라벨을 바꾸지 못했어요."),
+    );
   };
 
   // 카드를 누르면 그 카드 안에 "이동할 컬럼" 목록이 열린다 — 드래그하지 않고도 눌러서 옮길 수 있다.
@@ -82,7 +95,7 @@ export default function KanbanPage() {
 
   const clearCardLabels = (task: TaskCard) => {
     setLabelEditingId(null);
-    changeCardLabels(task.id, []).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
+    changeCardLabels(task.id, [], null).catch((err) => alertCardError(err, "라벨을 바꾸지 못했어요."));
   };
 
   return (
@@ -126,7 +139,7 @@ export default function KanbanPage() {
                     return <CardEditForm key={task.id} task={task} onDone={() => setEditingId(null)} />;
                   }
 
-                  const cardLabels = findLabels(labels, task.labelIds);
+                  const cardLabels = findCardLabels(labels, task);
                   const canManage = canManageCard(task);
                   const due = task.dueAt ? describeDue(task.dueAt) : null;
                   return (
@@ -241,6 +254,8 @@ export default function KanbanPage() {
                             labels={labels}
                             selectedIds={task.labelIds}
                             onToggle={(labelId) => toggleCardLabel(task, labelId)}
+                            customLabel={task.customLabel ?? ""}
+                            onCustomLabelChange={(text) => changeCustomLabel(task, text)}
                           />
                           <div className="flex w-full items-center justify-between">
                             <p className="text-[11px] text-[#9ca3af]">최대 {MAX_CARD_LABELS}개</p>
@@ -264,7 +279,9 @@ export default function KanbanPage() {
               {addingTo === column.id ? (
                 <NewCardForm
                   labels={labels}
-                  onSubmit={(title, labelIds, dueAt) => submitNewCard(column.id, title, labelIds, dueAt)}
+                  onSubmit={(title, labelIds, customLabel, dueAt) =>
+                    submitNewCard(column.id, title, labelIds, customLabel, dueAt)
+                  }
                   onCancel={() => setAddingTo(null)}
                 />
               ) : (

@@ -4,7 +4,7 @@ import Button from "../ui/Button";
 import NameColorForm, { type NameColorDraft } from "./NameColorForm";
 import { PALETTE_COLORS } from "../../lib/palette";
 import { ApiError } from "../../lib/api";
-import { createLabel, deleteLabel, updateLabel, type LabelDef } from "../../lib/labels";
+import { ETC_LABEL_ID, createLabel, deleteLabel, updateLabel, type LabelDef } from "../../lib/labels";
 import { useLabels } from "../../hooks/useLabels";
 
 /** "new"면 추가 폼, 라벨 id면 그 라벨의 편집 폼, null이면 폼 없음. */
@@ -102,9 +102,12 @@ export default function LabelSettings() {
                 <button type="button" onClick={() => startEdit(label)} className="text-[#6366f1] hover:underline">
                   편집
                 </button>
-                <button type="button" onClick={() => remove(label)} className="text-[#9ca3af] hover:text-[#ef4444]">
-                  삭제
-                </button>
+                {/* 기본 "기타" 라벨은 카드에서 글자를 직접 적는 데 쓰여서 지울 수 없다 (서버에서도 막는다). */}
+                {label.id !== ETC_LABEL_ID && (
+                  <button type="button" onClick={() => remove(label)} className="text-[#9ca3af] hover:text-[#ef4444]">
+                    삭제
+                  </button>
+                )}
               </div>
             </div>
           )}

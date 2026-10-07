@@ -3,7 +3,7 @@
 import type { TaskCard } from "../types/dashboard";
 
 export interface CardFilter {
-  /** 제목·설명 또는 작성자 이름에 들어 있는 글자 (대소문자 구분 없음). */
+  /** 제목·설명·직접 적은 라벨 또는 작성자 이름에 들어 있는 글자 (대소문자 구분 없음). */
   query: string;
   /** 고른 라벨 중 하나라도 붙어 있으면 통과. 비어 있으면 라벨로 거르지 않는다. */
   labelIds: string[];
@@ -33,6 +33,7 @@ export function matchesFilter(
     query &&
     !task.title.toLowerCase().includes(query) &&
     !(task.description ?? "").toLowerCase().includes(query) &&
+    !(task.customLabel ?? "").toLowerCase().includes(query) &&
     !task.createdByName.toLowerCase().includes(query)
   ) {
     return false;

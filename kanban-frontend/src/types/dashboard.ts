@@ -32,6 +32,8 @@ export interface TaskCard {
   status: CardStatus;
   /** 붙인 순서대로, 최대 2개 (MAX_CARD_LABELS). */
   labelIds: string[];
+  /** "기타" 라벨(ETC_LABEL_ID)에 직접 적은 글자. 기타 라벨이 없거나 안 적었으면 null. */
+  customLabel: string | null;
   /** 마감 일시 "YYYY-MM-DDTHH:mm:ss" (서버 LocalDateTime), 없으면 null. */
   dueAt: string | null;
   createdById: number;

@@ -32,6 +32,7 @@ interface CardDto {
   status: CardStatus;
   position: number;
   labelIds: string[];
+  customLabel: string | null;
   dueAt: string | null;
   createdById: number;
   createdByName: string;
@@ -51,6 +52,7 @@ function toTaskCard(dto: CardDto): TaskCard {
     description: dto.description ?? null,
     status: dto.status,
     labelIds: dto.labelIds ?? [],
+    customLabel: dto.customLabel ?? null,
     dueAt: dto.dueAt,
     createdById: dto.createdById,
     createdByName: dto.createdByName,
@@ -66,16 +68,17 @@ export function fetchCards(): Promise<TaskCard[]> {
   return apiRequest<CardDto[]>("/api/cards").then(toTaskCards);
 }
 
-/** dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
+/** customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
 export function createCard(
   title: string,
   status: CardStatus,
   labelIds: string[],
+  customLabel: string | null,
   dueAt: string | null,
 ): Promise<TaskCard> {
   return apiRequest<CardDto>("/api/cards", {
     method: "POST",
-    body: JSON.stringify({ title, status, labelIds, dueAt }),
+    body: JSON.stringify({ title, status, labelIds, customLabel, dueAt }),
   }).then(toTaskCard);
 }
 
@@ -100,11 +103,18 @@ export function moveCard(cardId: string, status: CardStatus, position: number): 
   }).then(toTaskCard);
 }
 
-/** 카드의 라벨 전체를 바꾼다. 빈 배열이면 라벨을 모두 뗀다. */
-export function changeCardLabels(cardId: string, labelIds: string[]): Promise<TaskCard> {
+/**
+ * 카드의 라벨 전체를 바꾼다. 빈 배열이면 라벨을 모두 뗀다.
+ * customLabel은 "기타" 라벨에 직접 적은 글자 — 기타 라벨이 labelIds에 없으면 서버가 버린다.
+ */
+export function changeCardLabels(
+  cardId: string,
+  labelIds: string[],
+  customLabel: string | null,
+): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/cards/${cardId}/label`, {
     method: "PATCH",
-    body: JSON.stringify({ labelIds }),
+    body: JSON.stringify({ labelIds, customLabel }),
   }).then(toTaskCard);
 }
 
