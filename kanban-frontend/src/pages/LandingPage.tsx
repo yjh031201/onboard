@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import Button from "../components/ui/Button";
+import Logo from "../components/ui/Logo";
+import { loginAsGuest } from "../lib/auth";
 
 interface FeatureCard {
   emoji: string;
@@ -18,7 +20,7 @@ export default function LandingPage() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-[#fafafa]">
       <nav className="flex w-full items-center justify-between bg-white px-[60px] py-[22px] shadow-[0px_2px_8px_rgba(0,0,0,0.04)]">
-        <p className="text-[16px] font-bold text-[#6366f1]">📋 칸반보드</p>
+        <Logo textClassName="text-[16px] font-bold text-[#6366f1]" />
         <div className="flex items-center gap-3.5">
           <Link to="/login" className="text-[14px] font-medium text-[#6b7280] hover:text-[#111827]">
             로그인
@@ -46,12 +48,16 @@ export default function LandingPage() {
           지금 바로 팀과 함께 시작해보세요.
         </p>
         <div className="flex gap-3 pt-3">
-          {/* 게스트 로그인은 아직 백엔드에 없어서 일단 로그인 화면으로 연결해뒀어요. */}
-          <Link to="/login">
-            <Button variant="primary" className="px-7 py-[13px] text-[15px]">
-              게스트로 이용
-            </Button>
-          </Link>
+          {/* 구글 로그인을 그대로 재사용 — 처음 가입하는 계정만 게스트로 표시되고, 게스트는
+              프로젝트를 새로 만들 수는 없지만 초대받아 멤버로 참여할 수 있다. */}
+          <Button
+            type="button"
+            variant="primary"
+            onClick={loginAsGuest}
+            className="px-7 py-[13px] text-[15px]"
+          >
+            게스트로 이용
+          </Button>
           <Link
             to="/login"
             className="flex items-center justify-center rounded-lg border border-[#e5e7eb] bg-white px-7 py-[13px] text-[15px] font-bold text-[#374151] transition-colors hover:bg-[#f9fafb]"

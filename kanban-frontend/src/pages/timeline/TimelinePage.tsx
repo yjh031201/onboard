@@ -1,4 +1,5 @@
 import PageShell from "../../components/layout/PageShell";
+import { useProjectId } from "../../hooks/useProjectId";
 import { useTimelineFeed } from "../../hooks/useTimelineFeed";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
@@ -53,7 +54,8 @@ function groupByDay(events: TimelineEventDto[]): TimelineGroup[] {
 }
 
 export default function TimelinePage() {
-  const events = useTimelineFeed();
+  const projectId = useProjectId();
+  const events = useTimelineFeed(projectId);
   const groups = groupByDay(events);
   const currentUser = getStoredUser();
 
@@ -64,7 +66,7 @@ export default function TimelinePage() {
   const removeEntry = (entry: TimelineEventDto) => {
     if (!window.confirm("이 활동 기록을 삭제할까요?")) return;
     // 목록 반영은 /topic/timeline-deleted 브로드캐스트로 이루어진다.
-    deleteTimelineEvent(entry.id).catch((err) => {
+    deleteTimelineEvent(projectId, entry.id).catch((err) => {
       window.alert(err instanceof ApiError ? err.message : "활동 기록을 삭제하지 못했어요.");
     });
   };

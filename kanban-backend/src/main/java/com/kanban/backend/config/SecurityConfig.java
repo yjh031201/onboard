@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.NullSecurityContextRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -49,6 +50,14 @@ public class SecurityConfig {
                 // 완전 STATELESS면 OAuth2 로그인 중 authorization request를 세션에 못 두고 잃어버림.
                 // API 인증 자체는 여전히 JWT뿐이고, 소셜 로그인 왕복 동안만 짧게 세션이 쓰인다.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                // Spring Security 기본값은 로그인 인증 정보를 세션에 저장했다가 다음 요청에 재사용한다 —
+                // JwtAuthenticationFilter는 SecurityContext가 비어있을 때만 토큰을 읽어서 채우기 때문에,
+                // 한 브라우저에서 OAuth2 로그인(세션 생성)을 한 번이라도 거치면 그 세션에 저장된 인증이
+                // 이후 다른 계정의 Bearer 토큰 요청에도 그대로 재사용되는 버그가 생긴다(계정 간 데이터가 섞여 보임).
+                // API 인증은 오직 JWT로만 하고 세션에는 절대 인증 정보를 읽거나 쓰지 않도록 명시적으로 막는다 —
+                // OAuth2 authorization request 저장(HttpSessionOAuth2AuthorizationRequestRepository)은
+                // 별도 메커니즘이라 이 설정과 무관하게 계속 동작한다.
+                .securityContext(securityContext -> securityContext.securityContextRepository(new NullSecurityContextRepository()))
                 .authorizeHttpRequests(auth -> auth
                 // signup/login/refresh/oauth-exchange만 인증 없이 허용 — refresh/exchange는
                 // 만료된 access token 또는 토큰이 아예 없는 상태로 호출되는 게 정상이라 여기 포함.
@@ -63,6 +72,10 @@ public class SecurityConfig {
                         "/api/auth/oauth/exchange"
                         ).permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        // 외부 서비스(GitHub/Slack/Google Drive) 연동 콜백은 브라우저가 직접
+                        // 리다이렉트로 호출해서 Authorization 헤더가 없다 — IntegrationStateStore의
+                        // state 토큰으로 대신 인증한다.
+                        .requestMatchers("/api/integrations/*/callback").permitAll()
                         // WebSocket(STOMP) 핸드셰이크는 여기서 열어두고, 실제 인증은
                         // StompAuthChannelInterceptor가 CONNECT 프레임의 JWT로 처리한다.
                         .requestMatchers("/ws/**").permitAll()

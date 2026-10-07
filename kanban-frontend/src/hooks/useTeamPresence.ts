@@ -12,18 +12,18 @@ function toTeamMember(event: PresenceEvent): TeamMember {
   };
 }
 
-/** 팀 전체 명단 + 현재 접속 상태를 불러오고, 이후 /topic/presence로 오는 온/오프라인 변화를 반영한다. */
-export function useTeamPresence() {
+/** 이 프로젝트 팀 명단 + 현재 접속 상태를 불러오고, 이후 /topic/projects/{projectId}/presence로 오는 온/오프라인 변화를 반영한다. */
+export function useTeamPresence(projectId: number) {
   const [members, setMembers] = useState<TeamMember[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetchPresenceRoster().then((roster) => {
+    fetchPresenceRoster(projectId).then((roster) => {
       if (!cancelled) setMembers(roster.map(toTeamMember));
     });
 
-    const unsubscribe = subscribeTopic<PresenceEvent>("/topic/presence", (event) => {
+    const unsubscribe = subscribeTopic<PresenceEvent>(`/topic/projects/${projectId}/presence`, (event) => {
       setMembers((prev) => {
         const updated = toTeamMember(event);
         const index = prev.findIndex((member) => member.id === updated.id);
@@ -39,7 +39,7 @@ export function useTeamPresence() {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
+  }, [projectId]);
 
   return members;
 }

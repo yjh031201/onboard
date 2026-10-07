@@ -1,7 +1,5 @@
 package com.kanban.backend.board;
 
-import com.kanban.backend.user.User;
-import com.kanban.backend.user.UserRole;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -33,8 +31,15 @@ public class Card {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Column(nullable = false, length = 200)
     private String title;
+
+    /** 카드 설명. 없으면 null. */
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
     /** 카드가 들어 있는 컬럼의 id (board_columns.id). */
     @Column(nullable = false, length = 20)
@@ -68,6 +73,7 @@ public class Card {
     private LocalDateTime updatedAt;
 
     public Card(
+            Long projectId,
             String title,
             String status,
             int position,
@@ -76,6 +82,7 @@ public class Card {
             Long createdById,
             String createdByName
     ) {
+        this.projectId = projectId;
         this.title = title;
         this.status = status;
         this.position = position;
@@ -104,15 +111,12 @@ public class Card {
         return this.labelIds.remove(labelId);
     }
 
-    public void update(String title, LocalDateTime dueAt) {
+    public void update(String title, String description, LocalDateTime dueAt) {
         this.title = title;
+        this.description = description;
         this.dueAt = dueAt;
     }
 
-    /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정·삭제 가능. */
-    public boolean isManageableBy(User user) {
-        return createdById.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
-    }
 
     @jakarta.persistence.PrePersist
     protected void onCreate() {

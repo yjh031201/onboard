@@ -120,20 +120,23 @@ npm run dev
 막습니다. 실제로 로그인이 되게 하려면 아래처럼 직접 앱을 등록해야 합니다 (계정당 한 번만 하면 됨).
 
 **구글**: [Google Cloud Console → API 및 서비스 → 사용자 인증 정보](https://console.cloud.google.com/apis/credentials)에서
-OAuth 클라이언트 ID 생성 → 승인된 리디렉션 URI에 `http://localhost:8080/login/oauth2/code/google` 추가.
+OAuth 클라이언트 ID 생성 → 승인된 리디렉션 URI에 `http://localhost:8080/login/oauth2/code/google`과
+"게스트로 이용" 전용인 `http://localhost:8080/login/oauth2/code/google-guest` 둘 다 추가.
+("승인된 JavaScript 원본"은 안 씀 — 서버 리다이렉트 방식이라 비워둬도 됨.)
 
 **네이버**: [네이버 개발자센터 → 애플리케이션 등록](https://developers.naver.com/apps)에서 앱 생성,
 사용 API에 "네이버 로그인" 추가(이름/이메일 제공 동의 필수) → 콜백 URL에
 `http://localhost:8080/login/oauth2/code/naver` 등록.
 
-발급받은 값은 `kanban-backend`를 실행하는 터미널/IntelliJ Run Configuration에 환경변수로 넣어주세요:
+발급받은 값은 `kanban-backend/.env` 파일로 넣는 게 제일 간단합니다(`kanban-backend/.env.example` 복사해서
+채우기 — git에는 안 올라감, `mvnw`/IntelliJ로 실행하면 자동으로 읽힘):
 
 ```
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-NAVER_CLIENT_ID=...
-NAVER_CLIENT_SECRET=...
+cd kanban-backend
+cp .env.example .env   # 값 채우기
 ```
+
+(터미널/IntelliJ Run Configuration에 환경변수로 직접 넣어도 동일하게 동작합니다 — 둘 중 편한 쪽으로.)
 
 로그인 성공/실패 후에는 백엔드가 `FRONTEND_BASE_URL`(기본값 `http://localhost:5173`)로 리다이렉트합니다.
 프론트를 다른 포트로 띄웠다면 이 값도 같이 맞춰주고, `CORS_ALLOWED_ORIGINS` 환경변수(CORS 허용 목록)에도 추가해야 합니다.

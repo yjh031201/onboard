@@ -6,6 +6,7 @@ import { PALETTE_COLORS } from "../../lib/palette";
 import { ApiError } from "../../lib/api";
 import { createLabel, deleteLabel, updateLabel, type LabelDef } from "../../lib/labels";
 import { useLabels } from "../../hooks/useLabels";
+import { useProjectId } from "../../hooks/useProjectId";
 
 /** "new"면 추가 폼, 라벨 id면 그 라벨의 편집 폼, null이면 폼 없음. */
 type EditingTarget = "new" | string | null;
@@ -15,7 +16,8 @@ type EditingTarget = "new" | string | null;
  * 목록 반영은 서버가 보내는 /topic/labels 브로드캐스트로 이루어진다 (useLabels).
  */
 export default function LabelSettings() {
-  const labels = useLabels();
+  const projectId = useProjectId();
+  const labels = useLabels(projectId);
   const [editing, setEditing] = useState<EditingTarget>(null);
   const [draft, setDraft] = useState<NameColorDraft>({ name: "", color: PALETTE_COLORS[0] });
   const [saving, setSaving] = useState(false);
@@ -48,9 +50,9 @@ export default function LabelSettings() {
     setSaving(true);
     try {
       if (editing === "new") {
-        await createLabel(name, draft.color);
+        await createLabel(projectId, name, draft.color);
       } else if (editing) {
-        await updateLabel(editing, name, draft.color);
+        await updateLabel(projectId, editing, name, draft.color);
       }
       setEditing(null);
       setError(null);
@@ -63,7 +65,7 @@ export default function LabelSettings() {
 
   const remove = (label: LabelDef) => {
     if (!window.confirm(`'${label.name}' 라벨을 삭제할까요?\n이 라벨이 붙어 있던 카드는 라벨 없음으로 바뀌어요.`)) return;
-    deleteLabel(label.id).catch((err) => {
+    deleteLabel(projectId, label.id).catch((err) => {
       window.alert(err instanceof ApiError ? err.message : "라벨을 삭제하지 못했어요.");
     });
   };

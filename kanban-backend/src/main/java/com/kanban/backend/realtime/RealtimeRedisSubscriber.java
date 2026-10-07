@@ -3,7 +3,8 @@ package com.kanban.backend.realtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.Message;
@@ -15,20 +16,19 @@ import org.springframework.stereotype.Component;
  * Relays every message received on a realtime Redis channel to the matching
  * STOMP topic, for whichever WebSocket clients happen to be connected to
  * this instance. This is the read side of the Redis pub-sub backplane.
+ *
+ * Board/label/column/timeline/presence/settings channels are all per-project
+ * ("realtime:projects:{id}:board" -> "/topic/projects/{id}/board", and the
+ * same for presence/settings), so the topic is derived from the channel name
+ * instead of a fixed lookup table — see {@link RealtimeRedisConfig} for the
+ * matching pattern subscription.
  */
 @Component
 public class RealtimeRedisSubscriber implements MessageListener {
 
     private static final Logger log = LoggerFactory.getLogger(RealtimeRedisSubscriber.class);
 
-    private static final Map<String, String> CHANNEL_TO_TOPIC = Map.of(
-            RealtimeChannels.BOARD_EVENTS, RealtimeChannels.BOARD_TOPIC,
-            RealtimeChannels.PRESENCE_EVENTS, RealtimeChannels.PRESENCE_TOPIC,
-            RealtimeChannels.TIMELINE_EVENTS, RealtimeChannels.TIMELINE_TOPIC,
-            RealtimeChannels.TIMELINE_DELETED_EVENTS, RealtimeChannels.TIMELINE_DELETED_TOPIC,
-            RealtimeChannels.LABEL_EVENTS, RealtimeChannels.LABEL_TOPIC,
-            RealtimeChannels.COLUMN_EVENTS, RealtimeChannels.COLUMN_TOPIC
-    );
+    private static final Pattern PROJECT_CHANNEL = Pattern.compile("^realtime:projects:(\\d+):(.+)$");
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
@@ -41,7 +41,7 @@ public class RealtimeRedisSubscriber implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         String channel = new String(message.getChannel(), StandardCharsets.UTF_8);
-        String topic = CHANNEL_TO_TOPIC.get(channel);
+        String topic = resolveTopic(channel);
         if (topic == null) {
             return;
         }
@@ -52,5 +52,15 @@ public class RealtimeRedisSubscriber implements MessageListener {
         } catch (IOException e) {
             log.warn("Failed to relay realtime event from channel {} to {}", channel, topic, e);
         }
+    }
+
+    private String resolveTopic(String channel) {
+        Matcher matcher = PROJECT_CHANNEL.matcher(channel);
+        if (!matcher.matches()) {
+            return null;
+        }
+        String projectId = matcher.group(1);
+        String suffix = matcher.group(2); // board | labels | columns | timeline | timeline-deleted | presence | settings
+        return "/topic/projects/" + projectId + "/" + suffix;
     }
 }

@@ -44,7 +44,7 @@ public class UserService {
         userRepository.save(user);
     }
 
-    /** 팀원 페이지 목록용 — 이 워크스페이스는 단일 팀 구조라 가입된 전체 사용자가 곧 팀원임. */
+    /** 멤버 초대 시 검색 후보로 전체 가입자 목록을 보여주기 위함 — 프로젝트 소속 여부와 무관. */
     @Transactional(readOnly = true)
     public List<UserResponse> listAll() {
         return userRepository.findAll().stream()
@@ -58,31 +58,5 @@ public class UserService {
         User found = userRepository.findByEmailOrPhone(keyword, keyword)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "일치하는 사용자를 찾을 수 없어요."));
         return UserResponse.from(found);
-    }
-
-    /**
-     * 팀원 권한 변경 — OWNER/ADMIN만 호출 가능.
-     * OWNER 권한을 주거나 빼앗는 변경은 OWNER만 할 수 있음 (ADMIN이 서로를 소유자로 올리는 것 방지).
-     */
-    @Transactional
-    public UserResponse changeRole(User requester, Long targetUserId, UserRole newRole) {
-        if (requester.getRole() == UserRole.MEMBER) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "권한을 변경할 권한이 없어요.");
-        }
-        if (requester.getId().equals(targetUserId)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "본인의 권한은 변경할 수 없어요.");
-        }
-
-        User target = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없어요."));
-
-        boolean touchesOwnerRole = newRole == UserRole.OWNER || target.getRole() == UserRole.OWNER;
-        if (touchesOwnerRole && requester.getRole() != UserRole.OWNER) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "소유자 권한은 소유자만 변경할 수 있어요.");
-        }
-
-        target.changeRole(newRole);
-        User saved = userRepository.save(target);
-        return UserResponse.from(saved);
     }
 }

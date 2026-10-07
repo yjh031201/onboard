@@ -3,17 +3,22 @@ import { Field } from "../ui/Field";
 import Button from "../ui/Button";
 import { Divider } from "../ui/Section";
 import { ApiError } from "../../lib/api";
-import { searchMember, updateMemberRole } from "../../lib/user";
+import { searchMember } from "../../lib/user";
 import type { AuthUser } from "../../lib/auth";
+import { inviteMember } from "../../lib/projectMembers";
 import RoleCheckboxes, { type Role } from "./RoleCheckboxes";
 
 interface InvitePopupProps {
+  projectId: number;
   onClose: () => void;
-  onAdded: (member: AuthUser) => void;
 }
 
-/** 이미 가입된 사용자를 이메일/휴대폰번호로 검색해서 찾은 뒤, 권한을 골라 구성원으로 추가. */
-export default function InvitePopup({ onClose, onAdded }: InvitePopupProps) {
+/**
+ * 이미 가입된 사용자를 이메일/휴대폰번호로 검색해서 찾은 뒤, 권한을 골라 초대를 보낸다.
+ * 초대는 바로 멤버가 되는 게 아니라 상대방이 수락해야 팀원 목록에 뜬다 — 그래서 성공해도
+ * 바로 목록에 추가하지 않고 "초대를 보냈다"는 결과만 보여준다.
+ */
+export default function InvitePopup({ projectId, onClose }: InvitePopupProps) {
   const [keyword, setKeyword] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -22,16 +27,18 @@ export default function InvitePopup({ onClose, onAdded }: InvitePopupProps) {
   const [role, setRole] = useState<Role>("MEMBER");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
     setSearchError(null);
     setFound(null);
+    setSent(false);
     setSearching(true);
     try {
       const member = await searchMember(keyword.trim());
       setFound(member);
-      setRole((member.role as Role) ?? "MEMBER");
+      setRole("MEMBER");
     } catch (err) {
       setSearchError(err instanceof ApiError ? err.message : "사용자 검색에 실패했어요.");
     } finally {
@@ -39,16 +46,15 @@ export default function InvitePopup({ onClose, onAdded }: InvitePopupProps) {
     }
   };
 
-  const handleAdd = async () => {
+  const handleInvite = async () => {
     if (!found) return;
     setAddError(null);
     setAdding(true);
     try {
-      const updated = await updateMemberRole(found.id, role);
-      onAdded(updated);
-      onClose();
+      await inviteMember(projectId, found.id, role);
+      setSent(true);
     } catch (err) {
-      setAddError(err instanceof ApiError ? err.message : "구성원 추가에 실패했어요.");
+      setAddError(err instanceof ApiError ? err.message : "초대를 보내지 못했어요.");
     } finally {
       setAdding(false);
     }
@@ -70,58 +76,75 @@ export default function InvitePopup({ onClose, onAdded }: InvitePopupProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSearch} className="flex w-full flex-col gap-[14px]">
-          <Field
-            label="이메일 또는 휴대폰 번호"
-            placeholder="example@email.com 또는 010-1234-5678"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            required
-          />
-
-          {searchError && (
-            <div className="w-full rounded-[10px] bg-[#fef2f2] px-4 py-3">
-              <p className="text-[13px] text-[#ef4444]">{searchError}</p>
+        {sent && found ? (
+          <div className="flex w-full flex-col gap-[14px]">
+            <div className="w-full rounded-[10px] bg-[#e9f9f1] px-4 py-3">
+              <p className="text-[13px] text-[#109568]">
+                {found.name}님에게 초대를 보냈어요. 상대방이 수락하면 팀원 목록에 추가돼요.
+              </p>
             </div>
-          )}
-
-          <div className="flex w-full justify-end">
-            <Button type="submit" variant="secondary" disabled={searching} className="disabled:opacity-60">
-              {searching ? "검색 중..." : "검색"}
-            </Button>
+            <div className="flex w-full justify-end">
+              <Button type="button" variant="primary" onClick={onClose}>
+                확인
+              </Button>
+            </div>
           </div>
-        </form>
-
-        {found && (
+        ) : (
           <>
-            <Divider />
-            <div className="flex w-full flex-col gap-[14px]">
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[13.5px] font-medium text-[#111827]">{found.name}</p>
-                <p className="text-[12px] text-[#6b7280]">{found.email}</p>
-              </div>
+            <form onSubmit={handleSearch} className="flex w-full flex-col gap-[14px]">
+              <Field
+                label="이메일 또는 휴대폰 번호"
+                placeholder="example@email.com 또는 010-1234-5678"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                required
+              />
 
-              <p className="text-[13px] font-medium text-[#111827]">권한 선택</p>
-              <RoleCheckboxes value={role} onChange={setRole} />
-
-              {addError && (
+              {searchError && (
                 <div className="w-full rounded-[10px] bg-[#fef2f2] px-4 py-3">
-                  <p className="text-[13px] text-[#ef4444]">{addError}</p>
+                  <p className="text-[13px] text-[#ef4444]">{searchError}</p>
                 </div>
               )}
 
               <div className="flex w-full justify-end">
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={handleAdd}
-                  disabled={adding}
-                  className="disabled:opacity-60"
-                >
-                  {adding ? "추가 중..." : "구성원으로 추가"}
+                <Button type="submit" variant="secondary" disabled={searching} className="disabled:opacity-60">
+                  {searching ? "검색 중..." : "검색"}
                 </Button>
               </div>
-            </div>
+            </form>
+
+            {found && (
+              <>
+                <Divider />
+                <div className="flex w-full flex-col gap-[14px]">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-[13.5px] font-medium text-[#111827]">{found.name}</p>
+                    <p className="text-[12px] text-[#6b7280]">{found.email}</p>
+                  </div>
+
+                  <p className="text-[13px] font-medium text-[#111827]">권한 선택</p>
+                  <RoleCheckboxes value={role} onChange={setRole} />
+
+                  {addError && (
+                    <div className="w-full rounded-[10px] bg-[#fef2f2] px-4 py-3">
+                      <p className="text-[13px] text-[#ef4444]">{addError}</p>
+                    </div>
+                  )}
+
+                  <div className="flex w-full justify-end">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={handleInvite}
+                      disabled={adding}
+                      className="disabled:opacity-60"
+                    >
+                      {adding ? "초대 보내는 중..." : "초대 보내기"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

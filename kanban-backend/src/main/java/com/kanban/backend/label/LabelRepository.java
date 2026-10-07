@@ -5,5 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LabelRepository extends JpaRepository<Label, String> {
 
-    List<Label> findAllByOrderByPositionAsc();
+    List<Label> findAllByProjectIdOrderByPositionAsc(Long projectId);
+
+    void deleteAllByProjectId(Long projectId);
+
+    boolean existsByIdAndProjectId(String id, Long projectId);
 }
