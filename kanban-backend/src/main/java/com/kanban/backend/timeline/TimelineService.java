@@ -1,11 +1,12 @@
 package com.kanban.backend.timeline;
 
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.integration.slack.SlackIntegrationService;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
-import com.kanban.backend.timeline.dto.TimelineEventDeleted;
 import com.kanban.backend.timeline.dto.TimelineEventResponse;
 import com.kanban.backend.user.User;
+import com.kanban.backend.user.UserRole;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -17,10 +18,16 @@ public class TimelineService {
 
     private final TimelineEventRepository timelineEventRepository;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final SlackIntegrationService slackIntegrationService;
 
-    public TimelineService(TimelineEventRepository timelineEventRepository, RealtimeEventPublisher realtimeEventPublisher) {
+    public TimelineService(
+            TimelineEventRepository timelineEventRepository,
+            RealtimeEventPublisher realtimeEventPublisher,
+            SlackIntegrationService slackIntegrationService
+    ) {
         this.timelineEventRepository = timelineEventRepository;
         this.realtimeEventPublisher = realtimeEventPublisher;
+        this.slackIntegrationService = slackIntegrationService;
     }
 
     /** Persists a timeline entry and broadcasts it live to everyone on /topic/timeline. */
@@ -32,20 +39,10 @@ public class TimelineService {
 
         TimelineEventResponse response = TimelineEventResponse.from(saved);
         realtimeEventPublisher.publish(RealtimeChannels.TIMELINE_EVENTS, response);
-        return response;
-    }
-
-    /** Deletes a timeline entry and tells every client to drop it via /topic/timeline-deleted. */
-    @Transactional
-    public void delete(Long eventId, User actor) {
-        TimelineEvent event = timelineEventRepository.findById(eventId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "타임라인 기록을 찾을 수 없습니다."));
-        if (!event.isDeletableBy(actor)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "본인의 활동 기록만 삭제할 수 있습니다.");
+        if (notified) {
+            slackIntegrationService.notifyIfConnected(message);
         }
-
-        timelineEventRepository.delete(event);
-        realtimeEventPublisher.publish(RealtimeChannels.TIMELINE_DELETED_EVENTS, new TimelineEventDeleted(eventId));
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -54,5 +51,20 @@ public class TimelineService {
                 .stream()
                 .map(TimelineEventResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public void delete(Long id, User actor) {
+        requireAdmin(actor);
+        if (!timelineEventRepository.existsById(id)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "타임라인 항목을 찾을 수 없습니다.");
+        }
+        timelineEventRepository.deleteById(id);
+    }
+
+    private void requireAdmin(User user) {
+        if (user.getRole() == UserRole.MEMBER) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "타임라인 항목은 관리자만 삭제할 수 있습니다.");
+        }
     }
 }

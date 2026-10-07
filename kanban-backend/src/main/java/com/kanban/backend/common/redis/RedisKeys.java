@@ -32,4 +32,8 @@ public final class RedisKeys {
     public static String refreshToken(Long userId) {
         return "refresh:" + userId;
     }
+
+    public static String integrationConnectState(String state) {
+        return "integration:state:" + state;
+    }
 }
