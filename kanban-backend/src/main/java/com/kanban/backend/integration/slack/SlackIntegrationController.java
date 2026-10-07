@@ -23,13 +23,16 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class SlackIntegrationController {
 
     private final SlackIntegrationService slackIntegrationService;
+    private final IntegrationService integrationService;
     private final String frontendBaseUrl;
 
     public SlackIntegrationController(
             SlackIntegrationService slackIntegrationService,
+            IntegrationService integrationService,
             @Value("${app.frontend-base-url}") String frontendBaseUrl
     ) {
         this.slackIntegrationService = slackIntegrationService;
+        this.integrationService = integrationService;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -38,7 +41,7 @@ public class SlackIntegrationController {
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         String authorizeUrl = slackIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }
@@ -65,7 +68,7 @@ public class SlackIntegrationController {
 
     @PostMapping("/test")
     public ResponseEntity<Void> test(@AuthenticationPrincipal User currentUser) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         slackIntegrationService.sendTestMessage();
         return ResponseEntity.noContent().build();
     }

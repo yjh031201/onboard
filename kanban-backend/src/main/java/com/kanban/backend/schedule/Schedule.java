@@ -1,7 +1,6 @@
 package com.kanban.backend.schedule;
 
 import com.kanban.backend.user.User;
-import com.kanban.backend.user.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -83,9 +82,13 @@ public class Schedule {
         this.color = color;
     }
 
-    /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정/삭제 가능. */
-    public boolean isEditableBy(User user) {
-        return createdBy.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
+    /**
+     * 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정/삭제 가능. isAdmin은 users.role(전역, 항상
+     * MEMBER로 고정됨)이 아니라 ProjectAccessService.isAdminInAnyProject(user) 결과를 서비스
+     * 레이어에서 미리 계산해서 넘겨준다.
+     */
+    public boolean isEditableBy(User user, boolean isAdmin) {
+        return createdBy.equals(user.getId()) || isAdmin;
     }
 
     @PrePersist

@@ -28,13 +28,16 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class GithubIntegrationController {
 
     private final GithubIntegrationService githubIntegrationService;
+    private final IntegrationService integrationService;
     private final String frontendBaseUrl;
 
     public GithubIntegrationController(
             GithubIntegrationService githubIntegrationService,
+            IntegrationService integrationService,
             @Value("${app.frontend-base-url}") String frontendBaseUrl
     ) {
         this.githubIntegrationService = githubIntegrationService;
+        this.integrationService = integrationService;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -43,7 +46,7 @@ public class GithubIntegrationController {
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         String authorizeUrl = githubIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }

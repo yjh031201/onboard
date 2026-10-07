@@ -3,6 +3,7 @@ package com.kanban.backend.project;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -51,5 +52,15 @@ public class ProjectAccessService {
         return projectMemberRepository.findByProjectIdAndUserIdAndStatus(projectId, userId, InviteStatus.ACCEPTED)
                 .map(ProjectMember::getRole)
                 .orElse(null);
+    }
+
+    /**
+     * 아직 특정 프로젝트에 속하지 않은 전역 기능(연동/파일/일정)에서 쓰는 체크 — 특정 프로젝트가
+     * 아니라 "이 사용자가 어딘가의 프로젝트에서든 OWNER/ADMIN인지"를 본다. 이 기능들을 나중에
+     * 프로젝트별로 완전히 분리하기 전까지의 임시 기준.
+     */
+    public boolean isAdminInAnyProject(User user) {
+        return projectMemberRepository.existsByUserIdAndStatusAndRoleIn(
+                user.getId(), InviteStatus.ACCEPTED, List.of(UserRole.OWNER, UserRole.ADMIN));
     }
 }

@@ -24,13 +24,16 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class DriveIntegrationController {
 
     private final DriveIntegrationService driveIntegrationService;
+    private final IntegrationService integrationService;
     private final String frontendBaseUrl;
 
     public DriveIntegrationController(
             DriveIntegrationService driveIntegrationService,
+            IntegrationService integrationService,
             @Value("${app.frontend-base-url}") String frontendBaseUrl
     ) {
         this.driveIntegrationService = driveIntegrationService;
+        this.integrationService = integrationService;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -39,7 +42,7 @@ public class DriveIntegrationController {
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         String authorizeUrl = driveIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }

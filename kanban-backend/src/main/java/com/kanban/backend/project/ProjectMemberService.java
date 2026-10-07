@@ -65,10 +65,10 @@ public class ProjectMemberService {
         return ProjectMemberResponse.from(member, target);
     }
 
-    /** 멤버 권한 변경 — OWNER/ADMIN만, 이미 수락한 멤버만 대상. */
+    /** 멤버 권한 변경 — OWNER만, 이미 수락한 멤버만 대상. ADMIN은 초대는 할 수 있어도 다른 사람의 권한은 못 바꾼다. */
     @Transactional
     public ProjectMemberResponse changeRole(Long projectId, Long userId, UpdateMemberRoleRequest request, User actor) {
-        projectAccessService.requireAdmin(projectId, actor);
+        projectAccessService.requireOwner(projectId, actor);
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserIdAndStatus(projectId, userId, InviteStatus.ACCEPTED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "이 프로젝트의 멤버가 아닙니다."));
 
