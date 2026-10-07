@@ -12,6 +12,7 @@ import TimelinePage from "./pages/timeline/TimelinePage";
 import MembersPage from "./pages/members/MembersPage";
 import FilesPage from "./pages/files/FilesPage";
 import SettingsPage from "./pages/settings/SettingsPage";
+import PrivacyPage from "./pages/PrivacyPage";
 
 function App() {
   return (
@@ -21,6 +22,8 @@ function App() {
       <Route path="/find-id" element={<FindIdPage />} />
       <Route path="/find-password" element={<FindPasswordPage />} />
       <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       <Route path="/" element={<HomePage />} />
 
