@@ -1,5 +1,4 @@
-// 칸반 카드 REST API. 실시간 반영은 subscribeTopic(`/topic/projects/${projectId}/board`, ...)로 별도 처리한다 (realtime.ts).
-// 카드는 프로젝트별로 나뉘어 있어서 모든 호출에 projectId가 필요하다.
+// 칸반 카드 REST API. 실시간 반영은 subscribeTopic("/topic/board", ...)로 별도 처리한다 (realtime.ts).
 
 import { ApiError, apiRequest } from "./api";
 import { getStoredUser } from "./auth";
@@ -33,6 +32,7 @@ interface CardDto {
   status: CardStatus;
   position: number;
   labelIds: string[];
+  customLabel: string | null;
   dueAt: string | null;
   createdById: number;
   createdByName: string;
@@ -52,6 +52,7 @@ function toTaskCard(dto: CardDto): TaskCard {
     description: dto.description ?? null,
     status: dto.status,
     labelIds: dto.labelIds ?? [],
+    customLabel: dto.customLabel ?? null,
     dueAt: dto.dueAt,
     createdById: dto.createdById,
     createdByName: dto.createdByName,
@@ -67,17 +68,18 @@ export function fetchCards(projectId: number): Promise<TaskCard[]> {
   return apiRequest<CardDto[]>(`/api/projects/${projectId}/cards`).then(toTaskCards);
 }
 
-/** dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
+/** customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
 export function createCard(
   projectId: number,
   title: string,
   status: CardStatus,
   labelIds: string[],
+  customLabel: string | null,
   dueAt: string | null,
 ): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/projects/${projectId}/cards`, {
     method: "POST",
-    body: JSON.stringify({ title, status, labelIds, dueAt }),
+    body: JSON.stringify({ title, status, labelIds, customLabel, dueAt }),
   }).then(toTaskCard);
 }
 
@@ -108,11 +110,19 @@ export function moveCard(
   }).then(toTaskCard);
 }
 
-/** 카드의 라벨 전체를 바꾼다. 빈 배열이면 라벨을 모두 뗀다. */
-export function changeCardLabels(projectId: number, cardId: string, labelIds: string[]): Promise<TaskCard> {
+/**
+ * 카드의 라벨 전체를 바꾼다. 빈 배열이면 라벨을 모두 뗀다.
+ * customLabel은 "기타" 라벨에 직접 적은 글자 — 기타 라벨이 labelIds에 없으면 서버가 버린다.
+ */
+export function changeCardLabels(
+  projectId: number,
+  cardId: string,
+  labelIds: string[],
+  customLabel: string | null,
+): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}/label`, {
     method: "PATCH",
-    body: JSON.stringify({ labelIds }),
+    body: JSON.stringify({ labelIds, customLabel }),
   }).then(toTaskCard);
 }
 

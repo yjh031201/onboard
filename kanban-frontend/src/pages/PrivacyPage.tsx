@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import Logo from "../components/ui/Logo";
 
 // 구글·네이버 OAuth 앱 게시(검수)에 필요한 개인정보처리방침. 로그인 없이 볼 수 있어야 한다.
 const EFFECTIVE_DATE = "2026년 10월 1일";
@@ -19,9 +19,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen w-full bg-[#fafafa] px-4 py-12">
       <article className="mx-auto flex w-[720px] max-w-full flex-col gap-7 rounded-2xl border border-[#f0f0f2] bg-white p-10 shadow-[0px_4px_16px_0px_rgba(0,0,0,0.05)]">
         <header className="flex flex-col gap-2">
-          <Link to="/" className="text-[14px] font-bold text-[#6366f1]">
-            📋 칸반보드
-          </Link>
+          <Logo iconSize="size-6" textClassName="text-[14px] font-bold text-[#6366f1]" />
           <h1 className="text-[23px] font-bold text-[#111827]">개인정보처리방침</h1>
           <p className="text-[13px] text-[#6b7280]">시행일: {EFFECTIVE_DATE}</p>
         </header>

@@ -104,9 +104,12 @@ export default function LabelSettings() {
                 <button type="button" onClick={() => startEdit(label)} className="text-[#6366f1] hover:underline">
                   편집
                 </button>
-                <button type="button" onClick={() => remove(label)} className="text-[#9ca3af] hover:text-[#ef4444]">
-                  삭제
-                </button>
+                {/* 기본 "기타" 라벨은 카드에서 글자를 직접 적는 데 쓰여서 지울 수 없다 (서버에서도 막는다). */}
+                {!label.isEtc && (
+                  <button type="button" onClick={() => remove(label)} className="text-[#9ca3af] hover:text-[#ef4444]">
+                    삭제
+                  </button>
+                )}
               </div>
             </div>
           )}
