@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # 사용법: sudo set-oauth-secret.sh GOOGLE   (또는 NAVER, GITHUB, SLACK, GOOGLE_DRIVE)
-#   PROVIDER_CLIENT_ID / PROVIDER_CLIENT_SECRET 이름으로 .env에 저장하므로 다른 provider도 그대로 동작한다.
 # Client ID(생략 가능)와 Client Secret(화면에 안 보임)을 입력받아 /opt/onboard/config/.env에 저장하고 백엔드를 재시작한다.
 set -euo pipefail
-PROVIDER=${1:?GOOGLE 또는 NAVER를 지정하세요}
+PROVIDER=${1:?GOOGLE, NAVER, GITHUB, SLACK, GOOGLE_DRIVE 중 하나를 지정하세요}
 ENV_FILE=/opt/onboard/config/.env
 
 set_env() {
@@ -25,4 +24,4 @@ unset SECRET
 cp "$ENV_FILE" /opt/onboard/app/.env
 cd /opt/onboard/app
 docker compose -f docker-compose.prod.yml -f deploy/docker-compose.server.yml up -d backend
-echo "저장하고 백엔드를 재시작했어요. 1분쯤 뒤에 로그인해 보세요."
+echo "저장하고 백엔드를 재시작했어요. 1분쯤 뒤에 다시 시도해 보세요."
