@@ -90,9 +90,11 @@ export default function MembersPage() {
     });
   };
 
-  // OWNER/ADMIN만 구성원을 초대하거나 권한을 바꿀 수 있음 (서버에서도 동일하게 검증됨) — 이 프로젝트에서의 내 role로 판단한다.
+  // OWNER/ADMIN은 구성원 초대와 연동 관리를 할 수 있음 (서버에서도 동일하게 검증됨) — 이 프로젝트에서의 내 role로 판단한다.
+  // 단, 다른 사람의 권한을 바꾸는 것은 OWNER만 가능 — ADMIN은 OWNER와 동급 권한을 갖지만 이것만은 예외.
   const myMembership = members.find((m) => m.userId === currentUser?.id);
-  const canManageRoles = myMembership?.role === "OWNER" || myMembership?.role === "ADMIN";
+  const canManageMembers = myMembership?.role === "OWNER" || myMembership?.role === "ADMIN";
+  const isOwner = myMembership?.role === "OWNER";
 
   const handleMemberUpdated = (updated: ProjectMemberDto) => {
     setMembers((prev) => prev.map((m) => (m.userId === updated.userId ? updated : m)));
@@ -103,7 +105,7 @@ export default function MembersPage() {
       <Section title="구성원 및 권한" description="이메일 또는 휴대폰번호로 팀원을 검색해서 추가하고 권한을 관리하세요">
         <div className="flex w-full items-center justify-between">
           <p className="text-[12.5px] font-medium text-[#6b7280]">총 {members.length}명</p>
-          {canManageRoles && (
+          {canManageMembers && (
             <Button variant="primary" onClick={() => setInviteOpen(true)}>
               + 구성원 초대
             </Button>
@@ -135,7 +137,7 @@ export default function MembersPage() {
                   <Pill bg={ROLE_PILL[member.role]?.bg ?? "#f3f4f6"} text={ROLE_PILL[member.role]?.text ?? "#6b7280"}>
                     {roleLabel(member.role)}
                   </Pill>
-                  {canManageRoles && member.userId !== currentUser?.id && (
+                  {isOwner && member.userId !== currentUser?.id && (
                     <button
                       type="button"
                       onClick={() => setEditingMember(member)}
@@ -182,7 +184,7 @@ export default function MembersPage() {
                       연결 안 됨
                     </Pill>
                   )}
-                  {canManageRoles ? (
+                  {canManageMembers ? (
                     <Button
                       variant={integration.connected ? "secondary" : "primary"}
                       onClick={() =>
@@ -219,7 +221,7 @@ export default function MembersPage() {
       {managingIntegration && (
         <IntegrationManagePopup
           status={managingIntegration}
-          canManage={canManageRoles}
+          canManage={canManageMembers}
           onClose={() => setManagingIntegration(null)}
           onDisconnected={loadIntegrations}
         />

@@ -20,5 +20,7 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
 
     boolean existsByProjectIdAndUserId(Long projectId, Long userId);
 
+    boolean existsByUserIdAndStatusAndRoleIn(Long userId, InviteStatus status, List<com.kanban.backend.user.UserRole> roles);
+
     void deleteAllByProjectId(Long projectId);
 }
