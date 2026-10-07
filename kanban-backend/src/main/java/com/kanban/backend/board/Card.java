@@ -36,6 +36,10 @@ public class Card {
     @Column(nullable = false, length = 200)
     private String title;
 
+    /** 카드 설명. 없으면 null. */
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     /** 카드가 들어 있는 컬럼의 id (board_columns.id). */
     @Column(nullable = false, length = 20)
     private String status;
@@ -104,8 +108,9 @@ public class Card {
         return this.labelIds.remove(labelId);
     }
 
-    public void update(String title, LocalDateTime dueAt) {
+    public void update(String title, String description, LocalDateTime dueAt) {
         this.title = title;
+        this.description = description;
         this.dueAt = dueAt;
     }
 

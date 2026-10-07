@@ -101,7 +101,7 @@ public class CardService {
         return CardResponse.from(card);
     }
 
-    /** 제목·마감 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
+    /** 제목·설명·마감 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
     @Transactional
     public CardResponse update(Long cardId, UpdateCardRequest request, User actor) {
         Card card = findCard(cardId);
@@ -109,7 +109,7 @@ public class CardService {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인이 만든 카드만 수정할 수 있습니다.");
         }
 
-        card.update(request.title().trim(), request.dueAt());
+        card.update(request.title().trim(), normalizeDescription(request.description()), request.dueAt());
         timelineService.record(
                 TimelineEventType.CARD_UPDATED,
                 "%s님이 '%s' 카드를 수정했습니다".formatted(actor.getName(), card.getTitle()),
@@ -182,6 +182,14 @@ public class CardService {
     private Card findCard(Long cardId) {
         return cardRepository.findById(cardId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."));
+    }
+
+    /** 앞뒤 공백을 떼고, 내용이 없으면 설명 없음(null)으로 저장한다. */
+    private String normalizeDescription(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        return description.strip();
     }
 
     /** null은 라벨 없음. 중복은 합치고, 최대 개수와 존재 여부를 검사한다. */

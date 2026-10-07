@@ -33,15 +33,43 @@ public class ProjectSettings {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    /** 팀원 페이지의 팀 이름. 아직 아무도 바꾸지 않았으면 null. */
+    @Column(name = "team_name", length = 100)
+    private String teamName;
+
     @Column(name = "updated_by")
     private Long updatedBy;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** 보관 중이면 프로젝트 전체가 읽기 전용이다 (ArchiveGuardInterceptor가 쓰기 요청을 막는다). */
+    @Column(nullable = false)
+    private boolean archived;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
     public void update(String projectName, String description, Long updatedBy) {
         this.projectName = projectName;
         this.description = description;
+        this.updatedBy = updatedBy;
+    }
+
+    public void renameTeam(String teamName, Long updatedBy) {
+        this.teamName = teamName;
+        this.updatedBy = updatedBy;
+    }
+
+    public void archive(Long updatedBy) {
+        this.archived = true;
+        this.archivedAt = LocalDateTime.now();
+        this.updatedBy = updatedBy;
+    }
+
+    public void unarchive(Long updatedBy) {
+        this.archived = false;
+        this.archivedAt = null;
         this.updatedBy = updatedBy;
     }
 

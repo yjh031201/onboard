@@ -10,10 +10,15 @@ export const MAX_CARD_LABELS = 2;
 /**
  * 카드 제목 스타일 — 칸반 페이지와 대시보드 위젯이 같이 쓴다.
  * 한글은 단어 단위로 줄바꿈(break-keep)하되, URL처럼 띄어쓰기 없는 긴 문자열은 어디서든 끊어서(overflow-wrap:anywhere)
- * 카드 밖으로 넘치지 않고 줄이 늘어나게 한다. min-w-0이 없으면 flex 자식이 내용 너비 밑으로 줄지 않는다.
+ * 카드 밖으로 넘치지 않고 줄이 늘어나게 한다.
+ * min-w-[40%]: 오른쪽 라벨·버튼에 밀려 제목이 한두 글자 폭으로 찌그러지지 않게 한다 —
+ * 자리가 모자라면 제목이 줄어드는 대신 라벨·버튼이 다음 줄로 내려간다 (부모가 flex-wrap).
  */
 export const CARD_TITLE_CLASS =
-  "min-w-0 flex-1 break-keep text-[13px] text-[#111827] [overflow-wrap:anywhere]";
+  "min-w-[40%] flex-1 break-keep text-[13px] text-[#111827] [overflow-wrap:anywhere]";
+
+/** 카드 설명 글자 수 제한 (서버 UpdateCardRequest와 같음). */
+export const MAX_CARD_DESCRIPTION_LENGTH = 2000;
 
 /** 카드 제목 입력값 정리 — 붙여넣은 줄바꿈은 공백으로 바꾼다 (제목은 한 문단). */
 export function normalizeCardTitle(value: string): string {
@@ -23,6 +28,7 @@ export function normalizeCardTitle(value: string): string {
 interface CardDto {
   id: number;
   title: string;
+  description: string | null;
   status: CardStatus;
   position: number;
   labelIds: string[];
@@ -42,6 +48,7 @@ function toTaskCard(dto: CardDto): TaskCard {
   return {
     id: String(dto.id),
     title: dto.title,
+    description: dto.description ?? null,
     status: dto.status,
     labelIds: dto.labelIds ?? [],
     dueAt: dto.dueAt,
@@ -59,18 +66,29 @@ export function fetchCards(): Promise<TaskCard[]> {
   return apiRequest<CardDto[]>("/api/cards").then(toTaskCards);
 }
 
-export function createCard(title: string, status: CardStatus, labelIds: string[]): Promise<TaskCard> {
+/** dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
+export function createCard(
+  title: string,
+  status: CardStatus,
+  labelIds: string[],
+  dueAt: string | null,
+): Promise<TaskCard> {
   return apiRequest<CardDto>("/api/cards", {
     method: "POST",
-    body: JSON.stringify({ title, status, labelIds }),
+    body: JSON.stringify({ title, status, labelIds, dueAt }),
   }).then(toTaskCard);
 }
 
-/** 제목·마감 수정. dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
-export function updateCard(cardId: string, title: string, dueAt: string | null): Promise<TaskCard> {
+/** 제목·설명·마감 수정. description이 비어 있으면 설명을 지운다. dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
+export function updateCard(
+  cardId: string,
+  title: string,
+  description: string,
+  dueAt: string | null,
+): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/cards/${cardId}`, {
     method: "PATCH",
-    body: JSON.stringify({ title, dueAt }),
+    body: JSON.stringify({ title, description, dueAt }),
   }).then(toTaskCard);
 }
 

@@ -14,6 +14,7 @@ public final class RealtimeChannels {
     public static final String TIMELINE_DELETED_EVENTS = "realtime:timeline-deleted";
     public static final String LABEL_EVENTS = "realtime:labels";
     public static final String COLUMN_EVENTS = "realtime:columns";
+    public static final String SETTINGS_EVENTS = "realtime:settings";
 
     public static final String BOARD_TOPIC = "/topic/board";
     public static final String PRESENCE_TOPIC = "/topic/presence";
@@ -21,6 +22,7 @@ public final class RealtimeChannels {
     public static final String TIMELINE_DELETED_TOPIC = "/topic/timeline-deleted";
     public static final String LABEL_TOPIC = "/topic/labels";
     public static final String COLUMN_TOPIC = "/topic/columns";
+    public static final String SETTINGS_TOPIC = "/topic/settings";
 
     private RealtimeChannels() {
     }

@@ -27,7 +27,8 @@ public class RealtimeRedisSubscriber implements MessageListener {
             RealtimeChannels.TIMELINE_EVENTS, RealtimeChannels.TIMELINE_TOPIC,
             RealtimeChannels.TIMELINE_DELETED_EVENTS, RealtimeChannels.TIMELINE_DELETED_TOPIC,
             RealtimeChannels.LABEL_EVENTS, RealtimeChannels.LABEL_TOPIC,
-            RealtimeChannels.COLUMN_EVENTS, RealtimeChannels.COLUMN_TOPIC
+            RealtimeChannels.COLUMN_EVENTS, RealtimeChannels.COLUMN_TOPIC,
+            RealtimeChannels.SETTINGS_EVENTS, RealtimeChannels.SETTINGS_TOPIC
     );
 
     private final SimpMessagingTemplate messagingTemplate;

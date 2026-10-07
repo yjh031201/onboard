@@ -27,6 +27,8 @@ export type CardStatus = string;
 export interface TaskCard {
   id: string;
   title: string;
+  /** 카드 설명. 없으면 null. */
+  description: string | null;
   status: CardStatus;
   /** 붙인 순서대로, 최대 2개 (MAX_CARD_LABELS). */
   labelIds: string[];
