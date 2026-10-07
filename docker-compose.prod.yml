@@ -60,6 +60,13 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
       NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
+      # GitHub·Slack·Google Drive 연동 — 서버 .env에 없으면 application.yml과 같은 dummy 값으로 뜬다.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-dummy-github-client-id}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-dummy-github-client-secret}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-dummy-slack-client-id}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-dummy-slack-client-secret}
+      GOOGLE_DRIVE_CLIENT_ID: ${GOOGLE_DRIVE_CLIENT_ID:-dummy-google-drive-client-id}
+      GOOGLE_DRIVE_CLIENT_SECRET: ${GOOGLE_DRIVE_CLIENT_SECRET:-dummy-google-drive-client-secret}
     depends_on:
       mysql:
         condition: service_healthy
