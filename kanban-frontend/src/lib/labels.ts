@@ -8,7 +8,13 @@ export interface LabelDef {
   id: string;
   name: string;
   color: string;
+  /** 기본 "기타" 라벨인지 — 프로젝트마다 id가 다르게 시드되므로 고정 id 대신 이 플래그로 찾는다.
+   *  붙인 카드마다 글자를 직접 적을 수 있고, 삭제할 수 없다. */
+  isEtc: boolean;
 }
+
+/** 라벨 이름·기타 라벨 직접 입력 글자 수 제한 (서버와 같음). */
+export const MAX_LABEL_NAME_LENGTH = 20;
 
 export function findLabel(labels: LabelDef[], id: string | null | undefined): LabelDef | undefined {
   return id ? labels.find((label) => label.id === id) : undefined;
@@ -21,6 +27,16 @@ export function findLabels(labels: LabelDef[], ids: string[]): LabelDef[] {
 
 export function fetchLabels(projectId: number): Promise<LabelDef[]> {
   return apiRequest<LabelDef[]>(`/api/projects/${projectId}/labels`);
+}
+
+/** 카드에 보여 줄 라벨 — "기타" 라벨에 직접 적은 글자가 있으면 이름 대신 그 글자를 보여 준다. */
+export function findCardLabels(
+  labels: LabelDef[],
+  card: { labelIds: string[]; customLabel: string | null },
+): LabelDef[] {
+  return findLabels(labels, card.labelIds).map((label) =>
+    label.isEtc && card.customLabel ? { ...label, name: card.customLabel } : label,
+  );
 }
 
 export function createLabel(projectId: number, name: string, color: string): Promise<LabelDef> {

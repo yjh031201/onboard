@@ -33,6 +33,11 @@ public class Label {
     @Column(nullable = false)
     private int position;
 
+    /** 기본 "기타" 라벨인지 — 프로젝트마다 id가 다르게 시드되므로(랜덤 생성) 고정 id 대신 이 플래그로 찾는다.
+     *  붙인 카드마다 글자를 직접 적을 수 있고(Card.customLabel), 그래서 삭제할 수 없다. */
+    @Column(name = "is_etc", nullable = false)
+    private boolean isEtc;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -40,11 +45,16 @@ public class Label {
     private LocalDateTime updatedAt;
 
     public Label(String id, Long projectId, String name, String color, int position) {
+        this(id, projectId, name, color, position, false);
+    }
+
+    public Label(String id, Long projectId, String name, String color, int position, boolean isEtc) {
         this.id = id;
         this.projectId = projectId;
         this.name = name;
         this.color = color;
         this.position = position;
+        this.isEtc = isEtc;
     }
 
     public void update(String name, String color) {

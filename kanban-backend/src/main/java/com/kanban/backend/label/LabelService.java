@@ -66,6 +66,9 @@ public class LabelService {
     public void delete(Long projectId, String id, User actor) {
         projectAccessService.requireMember(projectId, actor);
         Label label = findOrThrow(projectId, id);
+        if (label.isEtc()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "기본 '기타' 라벨은 삭제할 수 없습니다.");
+        }
         labelRepository.delete(label);
 
         cardService.clearLabel(projectId, id, actor);

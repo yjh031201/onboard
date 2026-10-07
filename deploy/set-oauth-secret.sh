@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 사용법: sudo set-oauth-secret.sh GOOGLE   (또는 NAVER)
+# 사용법: sudo set-oauth-secret.sh GOOGLE   (또는 NAVER, GITHUB, SLACK, GOOGLE_DRIVE)
+#   PROVIDER_CLIENT_ID / PROVIDER_CLIENT_SECRET 이름으로 .env에 저장하므로 다른 provider도 그대로 동작한다.
 # Client ID(생략 가능)와 Client Secret(화면에 안 보임)을 입력받아 /opt/onboard/config/.env에 저장하고 백엔드를 재시작한다.
 set -euo pipefail
 PROVIDER=${1:?GOOGLE 또는 NAVER를 지정하세요}

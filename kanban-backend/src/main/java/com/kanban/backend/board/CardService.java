@@ -17,6 +17,7 @@ import com.kanban.backend.timeline.TimelineService;
 import com.kanban.backend.user.User;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,9 +59,10 @@ public class CardService {
         projectAccessService.requireMember(projectId, actor);
         BoardColumn column = findColumn(projectId, request.status());
         List<String> labelIds = validLabelIds(projectId, request.labelIds());
+        String customLabel = normalizeCustomLabel(projectId, labelIds, request.customLabel());
         int position = cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, column.getId()).size();
         Card card = cardRepository.save(new Card(
-                projectId, request.title().trim(), column.getId(), position, labelIds, request.dueAt(),
+                projectId, request.title().trim(), column.getId(), position, labelIds, customLabel, request.dueAt(),
                 actor.getId(), actor.getName()
         ));
 
@@ -135,15 +137,19 @@ public class CardService {
         projectAccessService.requireMember(projectId, actor);
         Card card = findCard(projectId, cardId);
         List<String> labelIds = validLabelIds(projectId, request.labelIds());
-        if (labelIds.equals(card.getLabelIds())) {
+        String customLabel = normalizeCustomLabel(projectId, labelIds, request.customLabel());
+        if (labelIds.equals(card.getLabelIds()) && Objects.equals(customLabel, card.getCustomLabel())) {
             return CardResponse.from(card);
         }
 
-        card.changeLabels(labelIds);
+        card.changeLabels(labelIds, customLabel);
+        String etcId = labelRepository.findByProjectIdAndIsEtcTrue(projectId).map(Label::getId).orElse(null);
         String labelNames = labelIds.isEmpty()
                 ? "없음"
                 : String.join(", ", labelIds.stream()
-                        .map(id -> labelRepository.findById(id).map(Label::getName).orElse(id))
+                        .map(id -> id.equals(etcId) && customLabel != null
+                                ? customLabel
+                                : labelRepository.findById(id).map(Label::getName).orElse(id))
                         .toList());
         timelineService.record(
                 projectId,
@@ -242,6 +248,18 @@ public class CardService {
             }
         }
         return labelIds;
+    }
+
+    /** "기타" 라벨에 직접 적은 글자 — 기타 라벨이 이 프로젝트에 없거나, 카드에 안 붙어 있거나, 내용이 없으면 null. */
+    private String normalizeCustomLabel(Long projectId, List<String> labelIds, String customLabel) {
+        if (customLabel == null || customLabel.isBlank()) {
+            return null;
+        }
+        String etcId = labelRepository.findByProjectIdAndIsEtcTrue(projectId).map(Label::getId).orElse(null);
+        if (etcId == null || !labelIds.contains(etcId)) {
+            return null;
+        }
+        return customLabel.strip();
     }
 
     private void reorderWithinColumn(Long projectId, Card card, String status, int requestedPosition) {

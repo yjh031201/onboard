@@ -150,7 +150,7 @@ public class ProjectService {
         labelRepository.save(new Label(nextId(), projectId, "기능", "#6366f1", 1));
         labelRepository.save(new Label(nextId(), projectId, "디자인", "#a855f7", 2));
         labelRepository.save(new Label(nextId(), projectId, "긴급", "#f59e0b", 3));
-        labelRepository.save(new Label(nextId(), projectId, "기타", "#9ca3af", 4));
+        labelRepository.save(new Label(nextId(), projectId, "기타", "#9ca3af", 4, true));
     }
 
     private String nextId() {
