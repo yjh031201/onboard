@@ -1,10 +1,10 @@
 package com.kanban.backend.timeline;
 
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.integration.slack.SlackIntegrationService;
 import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
-import com.kanban.backend.timeline.dto.TimelineEventDeleted;
 import com.kanban.backend.timeline.dto.TimelineEventResponse;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
@@ -20,15 +20,18 @@ public class TimelineService {
     private final TimelineEventRepository timelineEventRepository;
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final ProjectAccessService projectAccessService;
+    private final SlackIntegrationService slackIntegrationService;
 
     public TimelineService(
             TimelineEventRepository timelineEventRepository,
             RealtimeEventPublisher realtimeEventPublisher,
-            ProjectAccessService projectAccessService
+            ProjectAccessService projectAccessService,
+            SlackIntegrationService slackIntegrationService
     ) {
         this.timelineEventRepository = timelineEventRepository;
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.projectAccessService = projectAccessService;
+        this.slackIntegrationService = slackIntegrationService;
     }
 
     /** Persists a timeline entry and broadcasts it live to everyone on /topic/projects/{projectId}/timeline. */
@@ -42,6 +45,9 @@ public class TimelineService {
 
         TimelineEventResponse response = TimelineEventResponse.from(saved);
         realtimeEventPublisher.publish(RealtimeChannels.timelineEvents(projectId), response);
+        if (notified) {
+            slackIntegrationService.notifyIfConnected(message);
+        }
         return response;
     }
 

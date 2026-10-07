@@ -72,6 +72,10 @@ public class SecurityConfig {
                         "/api/auth/oauth/exchange"
                         ).permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        // 외부 서비스(GitHub/Slack/Google Drive) 연동 콜백은 브라우저가 직접
+                        // 리다이렉트로 호출해서 Authorization 헤더가 없다 — IntegrationStateStore의
+                        // state 토큰으로 대신 인증한다.
+                        .requestMatchers("/api/integrations/*/callback").permitAll()
                         // WebSocket(STOMP) 핸드셰이크는 여기서 열어두고, 실제 인증은
                         // StompAuthChannelInterceptor가 CONNECT 프레임의 JWT로 처리한다.
                         .requestMatchers("/ws/**").permitAll()

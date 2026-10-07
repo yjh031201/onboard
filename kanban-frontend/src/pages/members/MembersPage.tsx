@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import PageShell from "../../components/layout/PageShell";
 import Section, { Divider } from "../../components/ui/Section";
 import Button from "../../components/ui/Button";
@@ -11,6 +12,8 @@ import { listProjectMembers, type ProjectMemberDto } from "../../lib/projectMemb
 import InvitePopup from "../../components/members/InvitePopup";
 import RolePopup from "../../components/members/RolePopup";
 import { roleLabel } from "../../components/members/RoleCheckboxes";
+import IntegrationManagePopup from "../../components/members/IntegrationManagePopup";
+import { fetchIntegrations, startConnect, type IntegrationProvider, type IntegrationStatus } from "../../lib/integrations";
 
 const ROLE_PILL: Record<string, { bg: string; text: string }> = {
   OWNER: { bg: "#eeeefe", text: "#6366f1" },
@@ -18,23 +21,11 @@ const ROLE_PILL: Record<string, { bg: string; text: string }> = {
   MEMBER: { bg: "#f3f4f6", text: "#6b7280" },
 };
 
-interface IntegrationRow {
-  id: string;
-  name: string;
-  description: string;
-  connected: boolean;
-}
-
-const INTEGRATIONS: IntegrationRow[] = [
-  { id: "github", name: "GitHub", description: "코드 저장소와 이슈를 연결하세요", connected: true },
-  { id: "slack", name: "Slack", description: "알림을 슬랙 채널로 받아보세요", connected: false },
-  {
-    id: "drive",
-    name: "Google Drive",
-    description: "파일을 동기화하고 첨부하세요",
-    connected: false,
-  },
-];
+const INTEGRATION_META: Record<IntegrationProvider, { name: string; description: string }> = {
+  GITHUB: { name: "GitHub", description: "코드 저장소와 이슈를 연결하세요" },
+  SLACK: { name: "Slack", description: "알림을 슬랙 채널로 받아보세요" },
+  GOOGLE_DRIVE: { name: "Google Drive", description: "파일을 동기화하고 첨부하세요" },
+};
 
 export default function MembersPage() {
   const projectId = useProjectId();
@@ -46,6 +37,17 @@ export default function MembersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<ProjectMemberDto | null>(null);
 
+  const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
+  const [managingIntegration, setManagingIntegration] = useState<IntegrationStatus | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [integrationBanner, setIntegrationBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const loadIntegrations = () => {
+    fetchIntegrations().then(setIntegrations).catch(() => {
+      /* 연동 상태는 부가 정보라, 실패해도 나머지 페이지는 그대로 쓸 수 있게 조용히 둔다. */
+    });
+  };
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -54,6 +56,39 @@ export default function MembersPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "팀원 목록을 불러오지 못했어요."))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  useEffect(() => {
+    loadIntegrations();
+  }, []);
+
+  // OAuth 콜백에서 돌아왔을 때(?integration=github&status=connected) 배너 한 번 띄우고 URL 정리.
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (!status) return;
+
+    const message = searchParams.get("message");
+    setIntegrationBanner({
+      type: status === "connected" ? "success" : "error",
+      text: status === "connected" ? "연동이 완료됐어요." : (message ?? "연동에 실패했어요."),
+    });
+    if (status === "connected") loadIntegrations();
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("integration");
+      next.delete("status");
+      next.delete("message");
+      return next;
+    }, { replace: true });
+  }, []);
+
+  const handleConnect = (provider: IntegrationProvider) => {
+    startConnect(provider).catch((err) => {
+      setIntegrationBanner({
+        type: "error",
+        text: err instanceof ApiError ? err.message : "연동을 시작하지 못했어요.",
+      });
+    });
+  };
 
   // OWNER/ADMIN만 구성원을 초대하거나 권한을 바꿀 수 있음 (서버에서도 동일하게 검증됨) — 이 프로젝트에서의 내 role로 판단한다.
   const myMembership = members.find((m) => m.userId === currentUser?.id);
@@ -116,31 +151,58 @@ export default function MembersPage() {
       </Section>
 
       <Section title="연동" description="외부 서비스와 연결해 팀 작업을 더 편리하게 만드세요">
-        {INTEGRATIONS.map((integration, i) => (
-          <div key={integration.id} className="flex w-full flex-col gap-[18px]">
-            {i > 0 && <Divider />}
-            <div className="flex w-full items-center justify-between">
-              <div className="flex flex-col gap-[3px]">
-                <p className="text-[13.5px] font-medium text-[#111827]">{integration.name}</p>
-                <p className="text-[12px] text-[#6b7280]">{integration.description}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                {integration.connected ? (
-                  <Pill bg="#e9f9f1" text="#109568">
-                    연결됨
-                  </Pill>
-                ) : (
-                  <Pill bg="#f3f4f6" text="#6b7280">
-                    연결 안 됨
-                  </Pill>
-                )}
-                <Button variant={integration.connected ? "secondary" : "primary"}>
-                  {integration.connected ? "관리" : "연결하기"}
-                </Button>
+        {integrationBanner && (
+          <div
+            className={`w-full rounded-[10px] px-4 py-3 ${
+              integrationBanner.type === "error" ? "bg-[#fef2f2]" : "bg-[#e9f9f1]"
+            }`}
+          >
+            <p className={`text-[13px] ${integrationBanner.type === "error" ? "text-[#ef4444]" : "text-[#109568]"}`}>
+              {integrationBanner.text}
+            </p>
+          </div>
+        )}
+        {integrations.map((integration, i) => {
+          const meta = INTEGRATION_META[integration.provider];
+          return (
+            <div key={integration.provider} className="flex w-full flex-col gap-[18px]">
+              {i > 0 && <Divider />}
+              <div className="flex w-full items-center justify-between">
+                <div className="flex flex-col gap-[3px]">
+                  <p className="text-[13.5px] font-medium text-[#111827]">{meta.name}</p>
+                  <p className="text-[12px] text-[#6b7280]">{meta.description}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {integration.connected ? (
+                    <Pill bg="#e9f9f1" text="#109568">
+                      연결됨
+                    </Pill>
+                  ) : (
+                    <Pill bg="#f3f4f6" text="#6b7280">
+                      연결 안 됨
+                    </Pill>
+                  )}
+                  {canManageRoles ? (
+                    <Button
+                      variant={integration.connected ? "secondary" : "primary"}
+                      onClick={() =>
+                        integration.connected ? setManagingIntegration(integration) : handleConnect(integration.provider)
+                      }
+                    >
+                      {integration.connected ? "관리" : "연결하기"}
+                    </Button>
+                  ) : (
+                    integration.connected && (
+                      <Button variant="secondary" onClick={() => setManagingIntegration(integration)}>
+                        보기
+                      </Button>
+                    )
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </Section>
 
       <Section title="팀 삭제" description="팀과 관련된 모든 데이터가 영구적으로 삭제되며 이 작업은 되돌릴 수 없습니다." danger>
@@ -155,6 +217,15 @@ export default function MembersPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           onUpdated={handleMemberUpdated}
+        />
+      )}
+
+      {managingIntegration && (
+        <IntegrationManagePopup
+          status={managingIntegration}
+          canManage={canManageRoles}
+          onClose={() => setManagingIntegration(null)}
+          onDisconnected={loadIntegrations}
         />
       )}
     </PageShell>
