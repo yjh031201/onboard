@@ -150,7 +150,20 @@ npm run dev
 - `cards.label_id` → `card_labels`(card_id, position, label_id) 연결 테이블로 이전 (기존 라벨 자동 이전)
 - `labels`에 `etc`("기타") 추가
 
-> 새 마이그레이션은 **V13부터** 만들어 주세요.
+### GitHub · Drive 연동 ↔ 칸반
+- **GitHub 이슈 가져오기**: 칸반 상단 버튼 → 이슈 선택 → 카드 생성 (제목·본문·원본 링크). 이미 가져온 이슈는 건너뜀
+- **카드 첨부 📎**: GitHub 이슈 / Drive 파일 링크 첨부·떼기 (카드당 10개). Drive는 링크만 붙음 → 열려면 공유 권한 필요
+
+| API | 변경 |
+|---|---|
+| `POST /api/projects/{id}/cards/import/github-issues` | **신규** — `{ status, issueNumbers }` |
+| `POST /api/projects/{id}/cards/{cardId}/attachments` | **신규** — `{ kind: GITHUB_ISSUE \| DRIVE_FILE, ref }` |
+| `DELETE /api/projects/{id}/cards/{cardId}/attachments/{attachmentId}` | **신규** |
+| 카드 응답 | `attachments` 추가 |
+
+**DB 마이그레이션 `V20__add_card_attachments.sql`** — `card_attachments` 테이블 (카드 삭제 시 같이 삭제)
+
+> 새 마이그레이션은 **V21부터** 만들어 주세요.
 
 ## 구글 / 네이버 로그인 설정
 
