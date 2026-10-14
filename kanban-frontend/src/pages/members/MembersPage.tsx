@@ -50,6 +50,18 @@ export default function MembersPage() {
     });
   };
 
+  // 관리 창에서 설정을 바꾼 뒤(예: GitHub 저장소) — 목록과 열려 있는 관리 창의 상태를 같이 새로 받는다.
+  const reloadManagingIntegration = () => {
+    fetchIntegrations()
+      .then((list) => {
+        setIntegrations(list);
+        setManagingIntegration((prev) => (prev ? (list.find((i) => i.provider === prev.provider) ?? prev) : prev));
+      })
+      .catch(() => {
+        /* 다시 못 받아 와도 저장은 됐으니, 창을 다시 열면 맞춰진다. */
+      });
+  };
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -241,6 +253,7 @@ export default function MembersPage() {
           canManage={canManageMembers}
           onClose={() => setManagingIntegration(null)}
           onDisconnected={loadIntegrations}
+          onRepoSaved={reloadManagingIntegration}
         />
       )}
     </PageShell>

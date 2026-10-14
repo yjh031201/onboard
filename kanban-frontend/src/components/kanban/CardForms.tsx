@@ -11,6 +11,7 @@ import {
 } from "../../lib/board";
 import type { ColumnDef } from "../../lib/boardColumns";
 import { MAX_LABEL_NAME_LENGTH, type LabelDef } from "../../lib/labels";
+import type { ProjectMemberDto } from "../../lib/projectMembers";
 import type { TaskCard } from "../../types/dashboard";
 
 /**
@@ -57,21 +58,26 @@ interface DueInputsProps {
   date: string;
   time: string;
   onChange: (date: string, time: string) => void;
+  /** true면 "마감" 글자를 숨긴다 — 카드 상세 창처럼 바깥에 이미 항목 이름이 있을 때. */
+  bare?: boolean;
 }
 
 /**
  * 마감 날짜·시간 입력. datetime-local 한 칸은 좁은 컬럼(대시보드)에서 잘려 달력 버튼이 안 보여서,
  * 날짜와 시간을 나누고 자리가 모자라면 줄바꿈되게 한다.
  */
-function DueInputs({ id, date, time, onChange }: DueInputsProps) {
+function DueInputs({ id, date, time, onChange, bare = false }: DueInputsProps) {
   return (
     <div className="flex w-full flex-wrap items-center gap-1.5">
-      <label htmlFor={id} className="shrink-0 text-[11.5px] text-[#6b7280]">
-        마감
-      </label>
+      {!bare && (
+        <label htmlFor={id} className="shrink-0 text-[11.5px] text-[#6b7280]">
+          마감
+        </label>
+      )}
       <input
         id={id}
         type="date"
+        aria-label={bare ? "마감 날짜" : undefined}
         value={date}
         onChange={(e) => onChange(e.target.value, e.target.value ? time : "")}
         className={`min-w-[118px] ${DUE_INPUT_CLASS}`}
@@ -98,20 +104,73 @@ function DueInputs({ id, date, time, onChange }: DueInputsProps) {
   );
 }
 
+interface AssigneeSelectProps {
+  /** label·select 연결용 — 한 화면에 폼이 여러 개 떠도 겹치지 않게 한다. */
+  id: string;
+  members: ProjectMemberDto[];
+  /** 고른 멤버의 userId, null이면 담당자 없음. */
+  value: number | null;
+  onChange: (assigneeId: number | null) => void;
+  /** 지금 담당자가 프로젝트를 나가 멤버 목록에 없을 때도 선택값으로 보여 주기 위한 이름. */
+  currentName?: string | null;
+  /** true면 "담당" 글자를 숨긴다 — 카드 상세 창처럼 바깥에 이미 항목 이름이 있을 때. */
+  bare?: boolean;
+}
+
+/** 카드 담당자 고르기 — 프로젝트 멤버 중 한 명, 또는 담당자 없음. */
+export function AssigneeSelect({ id, members, value, onChange, currentName, bare = false }: AssigneeSelectProps) {
+  const missing = value !== null && !members.some((member) => member.userId === value);
+  return (
+    <div className="flex w-full items-center gap-1.5">
+      {!bare && (
+        <label htmlFor={id} className="shrink-0 text-[11.5px] text-[#6b7280]">
+          담당
+        </label>
+      )}
+      <select
+        id={id}
+        aria-label={bare ? "담당자" : undefined}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+        className="min-w-0 flex-1 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[12px] text-[#111827] focus:border-[#6366f1] focus:outline-none"
+      >
+        <option value="">담당자 없음</option>
+        {missing && <option value={value}>{currentName ?? "알 수 없음"}</option>}
+        {members.map((member) => (
+          <option key={member.userId} value={member.userId}>
+            {member.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 interface NewCardFormProps {
   labels: LabelDef[];
-  /** customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
-  onSubmit: (title: string, labelIds: string[], customLabel: string | null, dueAt: string | null) => void;
+  members: ProjectMemberDto[];
+  /**
+   * customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음).
+   * assigneeId는 담당자 userId, null이면 담당자 없음.
+   */
+  onSubmit: (
+    title: string,
+    labelIds: string[],
+    customLabel: string | null,
+    dueAt: string | null,
+    assigneeId: number | null,
+  ) => void;
   onCancel: () => void;
 }
 
 /** 새 카드 입력 — Enter를 누르거나 폼 밖을 누르면 추가되고, 제목이 비었거나 Esc면 취소된다. */
-export function NewCardForm({ labels, onSubmit, onCancel }: NewCardFormProps) {
+export function NewCardForm({ labels, members, onSubmit, onCancel }: NewCardFormProps) {
   const [title, setTitle] = useState("");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [customLabel, setCustomLabel] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
+  const [assigneeId, setAssigneeId] = useState<number | null>(null);
   // Enter로 닫히면서 blur가 한 번 더 불려도 카드가 두 장 생기지 않게 한다.
   const closedRef = useRef(false);
   const titleRef = useAutoGrow(title);
@@ -120,7 +179,7 @@ export function NewCardForm({ labels, onSubmit, onCancel }: NewCardFormProps) {
     if (closedRef.current) return;
     closedRef.current = true;
     const trimmed = title.trim();
-    if (submit && trimmed) onSubmit(trimmed, labelIds, customLabel.trim() || null, toDueAt(dueDate, dueTime));
+    if (submit && trimmed) onSubmit(trimmed, labelIds, customLabel.trim() || null, toDueAt(dueDate, dueTime), assigneeId);
     else onCancel();
   };
 
@@ -165,6 +224,7 @@ export function NewCardForm({ labels, onSubmit, onCancel }: NewCardFormProps) {
           liveCustomLabel
         />
       </div>
+      <AssigneeSelect id="new-card-assignee" members={members} value={assigneeId} onChange={setAssigneeId} />
       <DueInputs
         id="new-card-due"
         date={dueDate}
@@ -197,14 +257,16 @@ export function CardDescription({ text, expanded }: CardDescriptionProps) {
   );
 }
 
-/** 카드 제목·설명·마감 수정 — 작성자 또는 관리자만 연다 (서버에서도 검사). */
+/** 카드 제목·설명·마감·담당자 수정 — 작성자 또는 관리자만 연다 (서버에서도 검사). */
 export function CardEditForm({
   projectId,
   task,
+  members,
   onDone,
 }: {
   projectId: number;
   task: TaskCard;
+  members: ProjectMemberDto[];
   onDone: () => void;
 }) {
   const [title, setTitle] = useState(task.title);
@@ -212,6 +274,7 @@ export function CardEditForm({
   // "2026-10-02T18:00:00" → 날짜 "2026-10-02", 시간 "18:00"
   const [dueDate, setDueDate] = useState(task.dueAt?.slice(0, 10) ?? "");
   const [dueTime, setDueTime] = useState(task.dueAt?.slice(11, 16) ?? "");
+  const [assigneeId, setAssigneeId] = useState(task.assigneeId);
   const [saving, setSaving] = useState(false);
   const titleRef = useAutoGrow(title);
   const descriptionRef = useAutoGrow(description);
@@ -220,7 +283,7 @@ export function CardEditForm({
     const trimmed = title.trim();
     if (!trimmed || saving) return;
     setSaving(true);
-    updateCard(projectId, task.id, trimmed, description.trim(), toDueAt(dueDate, dueTime))
+    updateCard(projectId, task.id, trimmed, description.trim(), toDueAt(dueDate, dueTime), assigneeId)
       .then(onDone)
       .catch((err) => {
         setSaving(false);
@@ -259,6 +322,13 @@ export function CardEditForm({
         aria-label="카드 설명"
         className={DESCRIPTION_INPUT_CLASS}
       />
+      <AssigneeSelect
+        id={`assignee-${task.id}`}
+        members={members}
+        value={assigneeId}
+        onChange={setAssigneeId}
+        currentName={task.assigneeName}
+      />
       <DueInputs
         id={`due-${task.id}`}
         date={dueDate}
@@ -289,6 +359,116 @@ export function CardEditForm({
   );
 }
 
+/**
+ * 바깥(서버 스냅샷) 값으로 시작하는 입력값 — 바깥 값이 바뀌면(다른 사람이 고쳤거나 내 저장이 반영되면) 입력값도 맞춘다.
+ * 카드 상세 창의 바로 고치기 입력칸들이 같이 쓴다.
+ */
+function useSyncedDraft<T>(value: T) {
+  const [draft, setDraft] = useState(value);
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setDraft(value);
+  }
+  return [draft, setDraft] as const;
+}
+
+/** 바로 고치기 입력칸에서 Esc — 고치던 것을 되돌린다. 상세 창까지 닫히지 않게 이벤트를 여기서 멈춘다. */
+function cancelOnEscape(e: KeyboardEvent<HTMLTextAreaElement>, revert: () => void) {
+  if (e.key !== "Escape") return false;
+  e.stopPropagation();
+  revert();
+  return true;
+}
+
+/** 카드 상세 창의 제목 — 누르면 바로 고치고, Enter를 누르거나 칸을 벗어나면 저장된다. 비우면 원래 제목으로 돌아간다. */
+export function InlineTitleEditor({ value, onSave }: { value: string; onSave: (title: string) => void }) {
+  const [draft, setDraft] = useSyncedDraft(value);
+  const ref = useAutoGrow(draft);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    else setDraft(value);
+  };
+
+  return (
+    <textarea
+      ref={ref}
+      id="card-detail-title"
+      rows={1}
+      value={draft}
+      onChange={(e) => setDraft(normalizeCardTitle(e.target.value))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (cancelOnEscape(e, () => setDraft(value))) return;
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      aria-label="카드 제목"
+      className="w-full resize-none overflow-hidden break-keep rounded-md border border-transparent px-1.5 py-1 -mx-1.5 text-[18px] font-bold text-[#111827] [field-sizing:content] [overflow-wrap:anywhere] hover:border-[#e5e7eb] focus:border-[#6366f1] focus:outline-none"
+    />
+  );
+}
+
+/** 카드 상세 창의 설명 — Enter는 줄바꿈이고, 칸을 벗어나면 저장된다. 비우면 설명이 지워진다. */
+export function InlineDescriptionEditor({ value, onSave }: { value: string; onSave: (description: string) => void }) {
+  const [draft, setDraft] = useSyncedDraft(value);
+  const ref = useAutoGrow(draft);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={3}
+      maxLength={MAX_CARD_DESCRIPTION_LENGTH}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft.trim() !== value) onSave(draft.trim());
+      }}
+      onKeyDown={(e) => {
+        if (cancelOnEscape(e, () => setDraft(value))) e.currentTarget.blur();
+      }}
+      placeholder="설명 추가"
+      aria-label="카드 설명"
+      className={`min-h-[72px] ${DESCRIPTION_INPUT_CLASS} text-[13px]`}
+    />
+  );
+}
+
+/** 카드 상세 창의 마감 — 날짜나 시간을 고르면 바로 저장된다. */
+export function DueEditor({
+  id,
+  dueAt,
+  onSave,
+}: {
+  id: string;
+  /** 서버 값 "YYYY-MM-DDTHH:mm:ss", 없으면 null. */
+  dueAt: string | null;
+  onSave: (dueAt: string | null) => void;
+}) {
+  // "2026-10-02T18:00:00" → 날짜 "2026-10-02", 시간 "18:00"
+  const [date, setDate] = useSyncedDraft(dueAt?.slice(0, 10) ?? "");
+  const [time, setTime] = useSyncedDraft(dueAt?.slice(11, 16) ?? "");
+
+  return (
+    <DueInputs
+      id={id}
+      bare
+      date={date}
+      time={time}
+      onChange={(nextDate, nextTime) => {
+        setDate(nextDate);
+        setTime(nextTime);
+        const next = toDueAt(nextDate, nextTime);
+        if (next !== (dueAt?.slice(0, 16) ?? null)) onSave(next);
+      }}
+    />
+  );
+}
+
 interface ColumnPickerProps {
   columns: ColumnDef[];
   /** 카드가 지금 있는 컬럼 — 옮길 곳 목록에서는 뺀다. */
@@ -296,7 +476,7 @@ interface ColumnPickerProps {
   onPick: (columnId: string) => void;
 }
 
-/** 카드를 눌렀을 때 카드 안에 뜨는 "상태"(옮길 컬럼) 버튼 목록 — 드래그 대신 눌러서 옮긴다. */
+/** 카드 상세 창에 뜨는 "상태"(옮길 컬럼) 버튼 목록 — 드래그 대신 눌러서 옮긴다. */
 export function ColumnPicker({ columns, currentId, onPick }: ColumnPickerProps) {
   const targets = columns.filter((column) => column.id !== currentId);
   if (targets.length === 0) {

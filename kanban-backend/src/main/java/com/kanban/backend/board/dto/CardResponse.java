@@ -13,6 +13,8 @@ public record CardResponse(
         List<String> labelIds,
         String customLabel,
         LocalDateTime dueAt,
+        Long assigneeId,
+        String assigneeName,
         Long createdById,
         String createdByName,
         LocalDateTime createdAt
@@ -27,6 +29,8 @@ public record CardResponse(
                 List.copyOf(card.getLabelIds()),
                 card.getCustomLabel(),
                 card.getDueAt(),
+                card.getAssigneeId(),
+                card.getAssigneeName(),
                 card.getCreatedById(),
                 card.getCreatedByName(),
                 card.getCreatedAt()

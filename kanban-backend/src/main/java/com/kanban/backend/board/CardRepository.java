@@ -23,4 +23,9 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     @Modifying
     @Query("update Card c set c.createdByName = :name where c.createdById = :userId")
     void renameCreator(@Param("userId") Long userId, @Param("name") String name);
+
+    /** 회원 탈퇴 시 — 담당자로 지정돼 있던 카드도 남기고, 담당자 이름만 바꾼다. */
+    @Modifying
+    @Query("update Card c set c.assigneeName = :name where c.assigneeId = :userId")
+    void renameAssignee(@Param("userId") Long userId, @Param("name") String name);
 }

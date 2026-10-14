@@ -9,6 +9,7 @@ import com.kanban.backend.integration.IntegrationRepository;
 import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.IntegrationStateStore;
 import com.kanban.backend.integration.github.dto.GithubIssueResponse;
+import com.kanban.backend.integration.github.dto.GithubRepoResponse;
 import com.kanban.backend.user.User;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -80,11 +81,102 @@ public class GithubIntegrationService {
         integrationRepository.save(integration);
     }
 
+    /**
+     * 저장소 연결 — GitHub에 실제로 있는 저장소인지 먼저 확인하고, GitHub이 돌려준 정확한 이름(대소문자 포함)으로 저장한다.
+     * 없는 저장소를 저장해 두고 이슈 목록에서야 실패하는 일이 없게 한다.
+     */
     @Transactional
     public void linkRepo(String owner, String repo, User currentUser) {
         integrationService.requireAdmin(currentUser);
         Integration integration = requireConnected();
-        integration.linkGithubRepo(owner, repo);
+
+        JsonNode found;
+        try {
+            found = readJson(githubGet(integration, "/repos/{owner}/{repo}", owner.trim(), repo.trim()));
+        } catch (RestClientResponseException e) {
+            throw translate(e, "저장소를 찾을 수 없어요. 소유자/저장소 이름을 확인해주세요.", "저장소를 확인하지 못했어요.");
+        }
+        integration.linkGithubRepo(
+                found.path("owner").path("login").asText(owner.trim()),
+                found.path("name").asText(repo.trim())
+        );
+    }
+
+    /**
+     * 소유자의 저장소 목록 (최근에 고친 순, 최대 100개).
+     * 연결한 계정 본인이면 비공개 저장소까지, 조직이면 그 조직에서 볼 수 있는 저장소를, 다른 사용자면 공개 저장소만 보인다.
+     */
+    @Transactional(readOnly = true)
+    public List<GithubRepoResponse> listRepos(String owner, User currentUser) {
+        integrationService.requireAdmin(currentUser);
+        Integration integration = requireConnected();
+        String trimmed = owner == null ? "" : owner.trim();
+        if (trimmed.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "저장소 소유자를 입력해주세요.");
+        }
+
+        String body;
+        try {
+            if (trimmed.equalsIgnoreCase(integration.getAccountLabel())) {
+                body = githubGet(integration, "/user/repos?affiliation=owner&sort=updated&per_page=100");
+            } else {
+                body = listOrgOrUserRepos(integration, trimmed);
+            }
+        } catch (RestClientResponseException e) {
+            throw translate(e, "'%s' 소유자를 찾을 수 없어요.".formatted(trimmed), "저장소 목록을 불러오지 못했어요.");
+        }
+
+        List<GithubRepoResponse> repos = new ArrayList<>();
+        for (JsonNode node : readJson(body)) {
+            String description = node.path("description").asText("");
+            repos.add(new GithubRepoResponse(
+                    node.path("name").asText(""),
+                    node.path("private").asBoolean(false),
+                    description.isBlank() ? null : description
+            ));
+        }
+        return repos;
+    }
+
+    /** 조직이면 조직 저장소(멤버라면 비공개 포함), 조직이 아니면(404) 그 사용자의 공개 저장소. */
+    private String listOrgOrUserRepos(Integration integration, String owner) {
+        try {
+            return githubGet(integration, "/orgs/{owner}/repos?sort=updated&per_page=100", owner);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() != 404) {
+                throw e;
+            }
+            return githubGet(integration, "/users/{owner}/repos?sort=updated&per_page=100", owner);
+        }
+    }
+
+    private String githubGet(Integration integration, String path, Object... uriVariables) {
+        return restClient.get()
+                .uri(API_BASE + path, uriVariables)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + integration.getAccessToken())
+                .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .retrieve()
+                .body(String.class);
+    }
+
+    private JsonNode readJson(String body) {
+        try {
+            return objectMapper.readTree(body);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 응답을 처리하지 못했어요.");
+        }
+    }
+
+    /** GitHub이 거절한 이유를 그대로 500으로 흘리지 않고, 사용자가 고칠 수 있는 안내로 바꾼다. */
+    private ApiException translate(RestClientResponseException e, String notFoundMessage, String fallbackMessage) {
+        int status = e.getStatusCode().value();
+        if (status == 404) {
+            return new ApiException(HttpStatus.BAD_REQUEST, notFoundMessage);
+        }
+        if (status == 401) {
+            return new ApiException(HttpStatus.BAD_REQUEST, "GitHub 연동이 만료됐어요. 연결을 해제하고 다시 연결해주세요.");
+        }
+        return new ApiException(HttpStatus.BAD_GATEWAY, fallbackMessage);
     }
 
     @Transactional(readOnly = true)

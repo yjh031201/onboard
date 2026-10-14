@@ -73,6 +73,17 @@ export function setGithubRepo(owner: string, repo: string): Promise<void> {
   });
 }
 
+export interface GithubRepo {
+  name: string;
+  isPrivate: boolean;
+  description: string | null;
+}
+
+/** 소유자(사용자 또는 조직)의 저장소 목록, 최근에 고친 순. 연결한 계정 본인이면 비공개 저장소도 나온다. */
+export function fetchGithubRepos(owner: string): Promise<GithubRepo[]> {
+  return apiRequest<GithubRepo[]>(`/api/integrations/github/repos?owner=${encodeURIComponent(owner)}`);
+}
+
 export function fetchGithubIssues(): Promise<GithubIssue[]> {
   return apiRequest<GithubIssue[]>("/api/integrations/github/issues");
 }

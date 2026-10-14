@@ -123,6 +123,7 @@ public class AccountDeletionService {
 
         // 2) 팀에 남는 기록은 이름만 지운다.
         cardRepository.renameCreator(userId, WITHDRAWN_USER_NAME);
+        cardRepository.renameAssignee(userId, WITHDRAWN_USER_NAME);
         timelineEventRepository.findAllByActorId(userId)
                 .forEach(event -> event.anonymizeActor(WITHDRAWN_USER_NAME));
 
