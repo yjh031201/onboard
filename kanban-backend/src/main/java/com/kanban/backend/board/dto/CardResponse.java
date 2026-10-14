@@ -17,9 +17,10 @@ public record CardResponse(
         String assigneeName,
         Long createdById,
         String createdByName,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        long commentCount
 ) {
-    public static CardResponse from(Card card) {
+    public static CardResponse from(Card card, long commentCount) {
         return new CardResponse(
                 card.getId(),
                 card.getTitle(),
@@ -33,7 +34,8 @@ public record CardResponse(
                 card.getAssigneeName(),
                 card.getCreatedById(),
                 card.getCreatedByName(),
-                card.getCreatedAt()
+                card.getCreatedAt(),
+                commentCount
         );
     }
 }

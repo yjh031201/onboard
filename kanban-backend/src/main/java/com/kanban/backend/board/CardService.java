@@ -6,6 +6,7 @@ import com.kanban.backend.board.dto.ChangeCardLabelRequest;
 import com.kanban.backend.board.dto.CreateCardRequest;
 import com.kanban.backend.board.dto.MoveCardRequest;
 import com.kanban.backend.board.dto.UpdateCardRequest;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
@@ -17,7 +18,9 @@ import com.kanban.backend.timeline.TimelineService;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,7 @@ public class CardService {
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final ProjectAccessService projectAccessService;
     private final UserRepository userRepository;
+    private final CardCommentRepository commentRepository;
 
     public CardService(
             CardRepository cardRepository,
@@ -41,7 +45,8 @@ public class CardService {
             TimelineService timelineService,
             RealtimeEventPublisher realtimeEventPublisher,
             ProjectAccessService projectAccessService,
-            UserRepository userRepository
+            UserRepository userRepository,
+            CardCommentRepository commentRepository
     ) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
@@ -50,6 +55,7 @@ public class CardService {
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.projectAccessService = projectAccessService;
         this.userRepository = userRepository;
+        this.commentRepository = commentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -81,7 +87,7 @@ public class CardService {
         );
         broadcastSnapshot(projectId, "CARD_CREATED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     @Transactional
@@ -113,7 +119,7 @@ public class CardService {
         }
         broadcastSnapshot(projectId, "CARD_MOVED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     /** 제목·설명·마감·담당자 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
@@ -140,7 +146,7 @@ public class CardService {
         );
         broadcastSnapshot(projectId, "CARD_UPDATED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     @Transactional
@@ -150,7 +156,7 @@ public class CardService {
         List<String> labelIds = validLabelIds(projectId, request.labelIds());
         String customLabel = normalizeCustomLabel(projectId, labelIds, request.customLabel());
         if (labelIds.equals(card.getLabelIds()) && Objects.equals(customLabel, card.getCustomLabel())) {
-            return CardResponse.from(card);
+            return toResponse(card);
         }
 
         card.changeLabels(labelIds, customLabel);
@@ -171,7 +177,7 @@ public class CardService {
         );
         broadcastSnapshot(projectId, "CARD_LABEL_CHANGED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     /** 라벨이 삭제될 때 호출 — 그 라벨이 붙어 있던 카드들에서 떼어낸다. */
@@ -194,6 +200,7 @@ public class CardService {
         }
 
         String status = card.getStatus();
+        commentRepository.deleteAllByCardId(cardId);
         cardRepository.delete(card);
 
         List<Card> column = new ArrayList<>(cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, status));
@@ -213,9 +220,18 @@ public class CardService {
     }
 
     private List<CardResponse> listInternal(Long projectId) {
+        // 카드마다 따로 세지 않고 한 번에 센다 — 스냅샷은 카드가 바뀔 때마다 나간다.
+        Map<Long, Long> commentCounts = new HashMap<>();
+        for (Object[] row : commentRepository.countByCardInProject(projectId)) {
+            commentCounts.put((Long) row[0], (Long) row[1]);
+        }
         return cardRepository.findAllByProjectIdOrderByStatusAscPositionAsc(projectId).stream()
-                .map(CardResponse::from)
+                .map(card -> CardResponse.from(card, commentCounts.getOrDefault(card.getId(), 0L)))
                 .toList();
+    }
+
+    private CardResponse toResponse(Card card) {
+        return CardResponse.from(card, commentRepository.countByCardId(card.getId()));
     }
 
     private BoardColumn findColumn(Long projectId, String columnId) {
@@ -317,7 +333,8 @@ public class CardService {
         return Math.max(0, Math.min(requested, size));
     }
 
-    private void broadcastSnapshot(Long projectId, String eventType, String actorName) {
+    /** 보드 전체 스냅샷을 보낸다 — 카드 말고 카드에 딸린 것(댓글 수 등)이 바뀌었을 때 CardCommentService도 부른다. */
+    public void broadcastSnapshot(Long projectId, String eventType, String actorName) {
         BoardEvent event = new BoardEvent(eventType, listInternal(projectId), actorName);
         realtimeEventPublisher.publish(RealtimeChannels.boardEvents(projectId), event);
     }

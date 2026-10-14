@@ -3,6 +3,7 @@ package com.kanban.backend.project;
 import com.kanban.backend.board.BoardColumn;
 import com.kanban.backend.board.BoardColumnRepository;
 import com.kanban.backend.board.CardRepository;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
@@ -29,6 +30,7 @@ public class ProjectService {
     private final BoardColumnRepository boardColumnRepository;
     private final LabelRepository labelRepository;
     private final CardRepository cardRepository;
+    private final CardCommentRepository commentRepository;
     private final TimelineEventRepository timelineEventRepository;
     private final RealtimeEventPublisher realtimeEventPublisher;
 
@@ -39,6 +41,7 @@ public class ProjectService {
             BoardColumnRepository boardColumnRepository,
             LabelRepository labelRepository,
             CardRepository cardRepository,
+            CardCommentRepository commentRepository,
             TimelineEventRepository timelineEventRepository,
             RealtimeEventPublisher realtimeEventPublisher
     ) {
@@ -48,6 +51,7 @@ public class ProjectService {
         this.boardColumnRepository = boardColumnRepository;
         this.labelRepository = labelRepository;
         this.cardRepository = cardRepository;
+        this.commentRepository = commentRepository;
         this.timelineEventRepository = timelineEventRepository;
         this.realtimeEventPublisher = realtimeEventPublisher;
     }
@@ -132,6 +136,7 @@ public class ProjectService {
         findOrThrow(projectId);
         projectAccessService.requireOwner(projectId, actor);
 
+        commentRepository.deleteAllByProjectId(projectId);
         cardRepository.deleteAllByProjectId(projectId);
         boardColumnRepository.deleteAllByProjectId(projectId);
         labelRepository.deleteAllByProjectId(projectId);

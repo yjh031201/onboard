@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.kanban.backend.auth.RefreshTokenStore;
 import com.kanban.backend.auth.oauth2.OAuthExchangeCodeRepository;
 import com.kanban.backend.board.CardRepository;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.file.FileStorageService;
 import com.kanban.backend.file.ProjectFile;
@@ -84,6 +85,7 @@ class AccountDeletionServiceTest {
                 integrationRepository,
                 mock(OAuthExchangeCodeRepository.class),
                 cardRepository,
+                mock(CardCommentRepository.class),
                 timelineEventRepository,
                 refreshTokenStore
         );

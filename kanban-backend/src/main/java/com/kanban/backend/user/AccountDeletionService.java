@@ -3,6 +3,7 @@ package com.kanban.backend.user;
 import com.kanban.backend.auth.RefreshTokenStore;
 import com.kanban.backend.auth.oauth2.OAuthExchangeCodeRepository;
 import com.kanban.backend.board.CardRepository;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.file.FileStorageService;
 import com.kanban.backend.file.ProjectFile;
@@ -55,6 +56,7 @@ public class AccountDeletionService {
     private final IntegrationRepository integrationRepository;
     private final OAuthExchangeCodeRepository oauthExchangeCodeRepository;
     private final CardRepository cardRepository;
+    private final CardCommentRepository commentRepository;
     private final TimelineEventRepository timelineEventRepository;
     private final RefreshTokenStore refreshTokenStore;
 
@@ -70,6 +72,7 @@ public class AccountDeletionService {
             IntegrationRepository integrationRepository,
             OAuthExchangeCodeRepository oauthExchangeCodeRepository,
             CardRepository cardRepository,
+            CardCommentRepository commentRepository,
             TimelineEventRepository timelineEventRepository,
             RefreshTokenStore refreshTokenStore
     ) {
@@ -84,6 +87,7 @@ public class AccountDeletionService {
         this.integrationRepository = integrationRepository;
         this.oauthExchangeCodeRepository = oauthExchangeCodeRepository;
         this.cardRepository = cardRepository;
+        this.commentRepository = commentRepository;
         this.timelineEventRepository = timelineEventRepository;
         this.refreshTokenStore = refreshTokenStore;
     }
@@ -124,6 +128,7 @@ public class AccountDeletionService {
         // 2) 팀에 남는 기록은 이름만 지운다.
         cardRepository.renameCreator(userId, WITHDRAWN_USER_NAME);
         cardRepository.renameAssignee(userId, WITHDRAWN_USER_NAME);
+        commentRepository.renameAuthor(userId, WITHDRAWN_USER_NAME);
         timelineEventRepository.findAllByActorId(userId)
                 .forEach(event -> event.anonymizeActor(WITHDRAWN_USER_NAME));
 

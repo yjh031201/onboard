@@ -239,17 +239,19 @@ export default function KanbanPage() {
                         <CardDescription text={task.description} expanded={false} />
                       )}
 
-                      {/* 담당자는 왼쪽에, 마감은 오른쪽에 — 둘 다 있을 때만 보여 준다 (작성자는 카드에 보이지 않는다). */}
+                      {/* 담당자는 왼쪽에, 마감은 오른쪽에 — 있을 때만 보여 준다 (작성자는 카드에 보이지 않는다). */}
                       <div className="flex w-full items-center justify-between gap-2 pl-[18px]">
                         <span className="min-w-0 truncate text-[11px] text-[#9ca3af]">{task.assigneeName}</span>
-                        {due && (
-                          <span
-                            className={`shrink-0 text-[11px] ${due.overdue ? "font-medium text-[#ef4444]" : "text-[#6b7280]"}`}
-                            title={due.overdue ? "마감이 지났어요" : "마감"}
-                          >
-                            ⏰ {due.text}
-                          </span>
-                        )}
+                        <span className="flex shrink-0 items-center gap-2">
+                          {due && (
+                            <span
+                              className={`text-[11px] ${due.overdue ? "font-medium text-[#ef4444]" : "text-[#6b7280]"}`}
+                              title={due.overdue ? "마감이 지났어요" : "마감"}
+                            >
+                              ⏰ {due.text}
+                            </span>
+                          )}
+                        </span>
                       </div>
 
                       {labelEditingId === task.id && (

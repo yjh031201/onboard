@@ -1,6 +1,6 @@
 // 카드 입력·수정 폼 — 칸반 페이지와 대시보드 칸반 위젯이 같이 쓴다.
 
-import { useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import {
   MAX_CARD_DESCRIPTION_LENGTH,
   MAX_CARD_LABELS,
@@ -13,44 +13,21 @@ import type { ColumnDef } from "../../lib/boardColumns";
 import { MAX_LABEL_NAME_LENGTH, type LabelDef } from "../../lib/labels";
 import type { ProjectMemberDto } from "../../lib/projectMembers";
 import type { TaskCard } from "../../types/dashboard";
+import { toDueAt, useAutoGrow } from "./cardFormUtils";
 
 /**
  * 카드 제목 입력칸 — 한 줄 input 대신 textarea라서 긴 제목은 옆으로 밀리지 않고 줄이 늘어난다.
  * field-sizing:content로 내용 높이에 맞춰 자라고, Enter는 줄바꿈 대신 저장이다.
  */
-const TITLE_INPUT_CLASS =
+export const TITLE_INPUT_CLASS =
   "w-full resize-none overflow-hidden break-keep rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-[13px] text-[#111827] [field-sizing:content] [overflow-wrap:anywhere] placeholder:text-[#9ca3af] focus:border-[#6366f1] focus:outline-none";
 
-/**
- * field-sizing:content를 지원하지 않는 브라우저(Firefox·Safari)에서도 입력칸이 내용 높이만큼 자라게 한다.
- * 이게 없으면 긴 제목이 한 줄짜리 칸 안에서 스크롤되어 앞부분이 안 보인다.
- */
-function useAutoGrow(value: string) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    // scrollHeight에는 테두리가 빠져 있어서 (border-box) 그만큼 더한다.
-    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
-  }, [value]);
-  return ref;
-}
-
 /** 카드 설명 입력칸 — 제목과 달리 Enter는 줄바꿈이다. */
-const DESCRIPTION_INPUT_CLASS =
+export const DESCRIPTION_INPUT_CLASS =
   "min-h-[52px] w-full resize-none overflow-hidden rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-[12px] text-[#374151] [field-sizing:content] [overflow-wrap:anywhere] placeholder:text-[#9ca3af] focus:border-[#6366f1] focus:outline-none";
 
 const DUE_INPUT_CLASS =
   "flex-1 rounded-md border border-[#e5e7eb] px-2 py-1 text-[12px] text-[#111827] focus:border-[#6366f1] focus:outline-none disabled:bg-[#f9fafb] disabled:text-[#9ca3af]";
-
-/** 시간을 비워 두면 그날 끝으로 본다. */
-const DEFAULT_DUE_TIME = "23:59";
-
-/** 날짜·시간 입력값 → 서버로 보낼 "YYYY-MM-DDTHH:mm". 날짜가 없으면 마감 없음(null). */
-function toDueAt(date: string, time: string): string | null {
-  return date ? `${date}T${time || DEFAULT_DUE_TIME}` : null;
-}
 
 interface DueInputsProps {
   /** label·input 연결용 — 한 화면에 폼이 여러 개 떠도 겹치지 않게 한다. */
@@ -66,7 +43,7 @@ interface DueInputsProps {
  * 마감 날짜·시간 입력. datetime-local 한 칸은 좁은 컬럼(대시보드)에서 잘려 달력 버튼이 안 보여서,
  * 날짜와 시간을 나누고 자리가 모자라면 줄바꿈되게 한다.
  */
-function DueInputs({ id, date, time, onChange, bare = false }: DueInputsProps) {
+export function DueInputs({ id, date, time, onChange, bare = false }: DueInputsProps) {
   return (
     <div className="flex w-full flex-wrap items-center gap-1.5">
       {!bare && (
@@ -356,116 +333,6 @@ export function CardEditForm({
         </button>
       </div>
     </div>
-  );
-}
-
-/**
- * 바깥(서버 스냅샷) 값으로 시작하는 입력값 — 바깥 값이 바뀌면(다른 사람이 고쳤거나 내 저장이 반영되면) 입력값도 맞춘다.
- * 카드 상세 창의 바로 고치기 입력칸들이 같이 쓴다.
- */
-function useSyncedDraft<T>(value: T) {
-  const [draft, setDraft] = useState(value);
-  const [syncedValue, setSyncedValue] = useState(value);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setDraft(value);
-  }
-  return [draft, setDraft] as const;
-}
-
-/** 바로 고치기 입력칸에서 Esc — 고치던 것을 되돌린다. 상세 창까지 닫히지 않게 이벤트를 여기서 멈춘다. */
-function cancelOnEscape(e: KeyboardEvent<HTMLTextAreaElement>, revert: () => void) {
-  if (e.key !== "Escape") return false;
-  e.stopPropagation();
-  revert();
-  return true;
-}
-
-/** 카드 상세 창의 제목 — 누르면 바로 고치고, Enter를 누르거나 칸을 벗어나면 저장된다. 비우면 원래 제목으로 돌아간다. */
-export function InlineTitleEditor({ value, onSave }: { value: string; onSave: (title: string) => void }) {
-  const [draft, setDraft] = useSyncedDraft(value);
-  const ref = useAutoGrow(draft);
-
-  const commit = () => {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== value) onSave(trimmed);
-    else setDraft(value);
-  };
-
-  return (
-    <textarea
-      ref={ref}
-      id="card-detail-title"
-      rows={1}
-      value={draft}
-      onChange={(e) => setDraft(normalizeCardTitle(e.target.value))}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (cancelOnEscape(e, () => setDraft(value))) return;
-        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-          e.preventDefault();
-          e.currentTarget.blur();
-        }
-      }}
-      aria-label="카드 제목"
-      className="w-full resize-none overflow-hidden break-keep rounded-md border border-transparent px-1.5 py-1 -mx-1.5 text-[18px] font-bold text-[#111827] [field-sizing:content] [overflow-wrap:anywhere] hover:border-[#e5e7eb] focus:border-[#6366f1] focus:outline-none"
-    />
-  );
-}
-
-/** 카드 상세 창의 설명 — Enter는 줄바꿈이고, 칸을 벗어나면 저장된다. 비우면 설명이 지워진다. */
-export function InlineDescriptionEditor({ value, onSave }: { value: string; onSave: (description: string) => void }) {
-  const [draft, setDraft] = useSyncedDraft(value);
-  const ref = useAutoGrow(draft);
-
-  return (
-    <textarea
-      ref={ref}
-      rows={3}
-      maxLength={MAX_CARD_DESCRIPTION_LENGTH}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft.trim() !== value) onSave(draft.trim());
-      }}
-      onKeyDown={(e) => {
-        if (cancelOnEscape(e, () => setDraft(value))) e.currentTarget.blur();
-      }}
-      placeholder="설명 추가"
-      aria-label="카드 설명"
-      className={`min-h-[72px] ${DESCRIPTION_INPUT_CLASS} text-[13px]`}
-    />
-  );
-}
-
-/** 카드 상세 창의 마감 — 날짜나 시간을 고르면 바로 저장된다. */
-export function DueEditor({
-  id,
-  dueAt,
-  onSave,
-}: {
-  id: string;
-  /** 서버 값 "YYYY-MM-DDTHH:mm:ss", 없으면 null. */
-  dueAt: string | null;
-  onSave: (dueAt: string | null) => void;
-}) {
-  // "2026-10-02T18:00:00" → 날짜 "2026-10-02", 시간 "18:00"
-  const [date, setDate] = useSyncedDraft(dueAt?.slice(0, 10) ?? "");
-  const [time, setTime] = useSyncedDraft(dueAt?.slice(11, 16) ?? "");
-
-  return (
-    <DueInputs
-      id={id}
-      bare
-      date={date}
-      time={time}
-      onChange={(nextDate, nextTime) => {
-        setDate(nextDate);
-        setTime(nextTime);
-        const next = toDueAt(nextDate, nextTime);
-        if (next !== (dueAt?.slice(0, 16) ?? null)) onSave(next);
-      }}
-    />
   );
 }
 

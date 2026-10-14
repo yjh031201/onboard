@@ -11,6 +11,7 @@ const TYPE_ICON: Record<TimelineEventDto["type"], { icon: string; bg: string }> 
   CARD_CREATED: { icon: "+", bg: "#eeeefe" },
   CARD_UPDATED: { icon: "✎", bg: "#e0f2fe" },
   CARD_LABEL_CHANGED: { icon: "#", bg: "#f3e8ff" },
+  CARD_COMMENTED: { icon: "💬", bg: "#dcfce7" },
 };
 
 function isSameDay(a: Date, b: Date): boolean {
