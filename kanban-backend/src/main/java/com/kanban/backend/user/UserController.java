@@ -2,11 +2,13 @@ package com.kanban.backend.user;
 
 import com.kanban.backend.auth.dto.UserResponse;
 import com.kanban.backend.user.dto.ChangePasswordRequest;
+import com.kanban.backend.user.dto.DeleteAccountRequest;
 import com.kanban.backend.user.dto.UpdateProfileRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,9 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final AccountDeletionService accountDeletionService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, AccountDeletionService accountDeletionService) {
         this.userService = userService;
+        this.accountDeletionService = accountDeletionService;
     }
 
     @PatchMapping("/me")
@@ -40,6 +44,16 @@ public class UserController {
             @Valid @RequestBody ChangePasswordRequest request
     ) {
         userService.changePassword(user, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 회원 탈퇴 — 본인 확인용 비밀번호를 body로 받는다 (소셜 로그인 전용 계정은 body 없이도 됨). */
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteMe(
+            @AuthenticationPrincipal User user,
+            @RequestBody(required = false) DeleteAccountRequest request
+    ) {
+        accountDeletionService.delete(user, request);
         return ResponseEntity.noContent().build();
     }
 

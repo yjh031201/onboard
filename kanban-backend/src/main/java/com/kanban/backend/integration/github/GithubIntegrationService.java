@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 public class GithubIntegrationService {
@@ -93,13 +94,26 @@ public class GithubIntegrationService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "먼저 연결할 저장소를 설정해주세요.");
         }
 
-        String body = restClient.get()
-                .uri(API_BASE + "/repos/{owner}/{repo}/issues?state=open&per_page=20",
-                        integration.getGithubOwner(), integration.getGithubRepo())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + integration.getAccessToken())
-                .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                .retrieve()
-                .body(String.class);
+        String body;
+        try {
+            body = restClient.get()
+                    .uri(API_BASE + "/repos/{owner}/{repo}/issues?state=open&per_page=20",
+                            integration.getGithubOwner(), integration.getGithubRepo())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + integration.getAccessToken())
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException e) {
+            // GitHub이 거절한 이유를 그대로 500으로 흘리지 않고, 사용자가 고칠 수 있는 안내로 바꾼다.
+            int status = e.getStatusCode().value();
+            if (status == 404) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "저장소를 찾을 수 없어요. 소유자/저장소 이름을 확인해주세요.");
+            }
+            if (status == 401) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "GitHub 연동이 만료됐어요. 연결을 해제하고 다시 연결해주세요.");
+            }
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 이슈 목록을 불러오지 못했어요.");
+        }
 
         return parseIssues(body);
     }

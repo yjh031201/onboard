@@ -23,4 +23,7 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     boolean existsByUserIdAndStatusAndRoleIn(Long userId, InviteStatus status, List<com.kanban.backend.user.UserRole> roles);
 
     void deleteAllByProjectId(Long projectId);
+
+    /** 회원 탈퇴 시 — 수락한 멤버십과 아직 답하지 않은(PENDING) 초대를 모두 지운다. */
+    void deleteAllByUserId(Long userId);
 }

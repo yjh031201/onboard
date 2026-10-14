@@ -13,6 +13,7 @@ import InvitePopup from "../../components/members/InvitePopup";
 import RolePopup from "../../components/members/RolePopup";
 import { roleLabel } from "../../components/members/RoleCheckboxes";
 import IntegrationManagePopup from "../../components/members/IntegrationManagePopup";
+import SlackConnectPopup from "../../components/members/SlackConnectPopup";
 import { fetchIntegrations, startConnect, type IntegrationProvider, type IntegrationStatus } from "../../lib/integrations";
 
 const ROLE_PILL: Record<string, { bg: string; text: string }> = {
@@ -39,6 +40,7 @@ export default function MembersPage() {
 
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
   const [managingIntegration, setManagingIntegration] = useState<IntegrationStatus | null>(null);
+  const [slackConnectOpen, setSlackConnectOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [integrationBanner, setIntegrationBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -82,6 +84,11 @@ export default function MembersPage() {
   }, []);
 
   const handleConnect = (provider: IntegrationProvider) => {
+    // Slack은 웹훅 주소만 붙여 넣어도 연결되므로, 바로 OAuth로 보내지 않고 연결 팝업을 띄운다.
+    if (provider === "SLACK") {
+      setSlackConnectOpen(true);
+      return;
+    }
     startConnect(provider).catch((err) => {
       setIntegrationBanner({
         type: "error",
@@ -215,6 +222,16 @@ export default function MembersPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           onUpdated={handleMemberUpdated}
+        />
+      )}
+
+      {slackConnectOpen && (
+        <SlackConnectPopup
+          onClose={() => setSlackConnectOpen(false)}
+          onConnected={() => {
+            setIntegrationBanner({ type: "success", text: "연동이 완료됐어요." });
+            loadIntegrations();
+          }}
         />
       )}
 

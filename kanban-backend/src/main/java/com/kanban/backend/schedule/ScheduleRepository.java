@@ -15,4 +15,6 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             ORDER BY s.startDate ASC, s.startTime ASC
             """)
     List<Schedule> findOverlapping(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    void deleteAllByCreatedBy(Long createdBy);
 }

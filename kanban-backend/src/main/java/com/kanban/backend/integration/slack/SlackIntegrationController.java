@@ -2,9 +2,11 @@ package com.kanban.backend.integration.slack;
 
 import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.dto.ConnectUrlResponse;
+import com.kanban.backend.integration.slack.dto.SlackWebhookRequest;
 import com.kanban.backend.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -64,6 +67,16 @@ public class SlackIntegrationController {
         } catch (Exception e) {
             response.sendRedirect(redirectTarget("error", "Slack 연동에 실패했어요."));
         }
+    }
+
+    @PostMapping("/webhook")
+    public ResponseEntity<Void> connectWithWebhook(
+            @Valid @RequestBody SlackWebhookRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        integrationService.requireAdmin(currentUser);
+        slackIntegrationService.connectWithWebhook(currentUser.getId(), request.webhookUrl());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/test")
