@@ -1,5 +1,5 @@
 // 카드 라벨 REST API — 설정 페이지 "라벨" 섹션과 칸반보드 카드가 공유한다.
-// 실시간 반영은 subscribeTopic("/topic/labels", ...)로 처리한다 (useLabels 훅).
+// 실시간 반영은 subscribeTopic(`/topic/projects/${projectId}/labels`, ...)로 처리한다 (useLabels 훅).
 // 카드에는 라벨 id만 저장되므로(card_labels), 이름/색을 바꾸면 모든 카드에 바로 반영된다.
 
 import { apiRequest } from "./api";
@@ -8,7 +8,13 @@ export interface LabelDef {
   id: string;
   name: string;
   color: string;
+  /** 기본 "기타" 라벨인지 — 프로젝트마다 id가 다르게 시드되므로 고정 id 대신 이 플래그로 찾는다.
+   *  붙인 카드마다 글자를 직접 적을 수 있고, 삭제할 수 없다. */
+  isEtc: boolean;
 }
+
+/** 라벨 이름·기타 라벨 직접 입력 글자 수 제한 (서버와 같음). */
+export const MAX_LABEL_NAME_LENGTH = 20;
 
 export function findLabel(labels: LabelDef[], id: string | null | undefined): LabelDef | undefined {
   return id ? labels.find((label) => label.id === id) : undefined;
@@ -19,25 +25,35 @@ export function findLabels(labels: LabelDef[], ids: string[]): LabelDef[] {
   return ids.map((id) => findLabel(labels, id)).filter((label): label is LabelDef => label !== undefined);
 }
 
-export function fetchLabels(): Promise<LabelDef[]> {
-  return apiRequest<LabelDef[]>("/api/labels");
+export function fetchLabels(projectId: number): Promise<LabelDef[]> {
+  return apiRequest<LabelDef[]>(`/api/projects/${projectId}/labels`);
 }
 
-export function createLabel(name: string, color: string): Promise<LabelDef> {
-  return apiRequest<LabelDef>("/api/labels", {
+/** 카드에 보여 줄 라벨 — "기타" 라벨에 직접 적은 글자가 있으면 이름 대신 그 글자를 보여 준다. */
+export function findCardLabels(
+  labels: LabelDef[],
+  card: { labelIds: string[]; customLabel: string | null },
+): LabelDef[] {
+  return findLabels(labels, card.labelIds).map((label) =>
+    label.isEtc && card.customLabel ? { ...label, name: card.customLabel } : label,
+  );
+}
+
+export function createLabel(projectId: number, name: string, color: string): Promise<LabelDef> {
+  return apiRequest<LabelDef>(`/api/projects/${projectId}/labels`, {
     method: "POST",
     body: JSON.stringify({ name, color }),
   });
 }
 
-export function updateLabel(id: string, name: string, color: string): Promise<LabelDef> {
-  return apiRequest<LabelDef>(`/api/labels/${id}`, {
+export function updateLabel(projectId: number, id: string, name: string, color: string): Promise<LabelDef> {
+  return apiRequest<LabelDef>(`/api/projects/${projectId}/labels/${id}`, {
     method: "PUT",
     body: JSON.stringify({ name, color }),
   });
 }
 
 /** 삭제하면 그 라벨이 붙어 있던 카드들에서 떨어진다 (서버에서 처리). */
-export function deleteLabel(id: string): Promise<void> {
-  return apiRequest<void>(`/api/labels/${id}`, { method: "DELETE" });
+export function deleteLabel(projectId: number, id: string): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/labels/${id}`, { method: "DELETE" });
 }

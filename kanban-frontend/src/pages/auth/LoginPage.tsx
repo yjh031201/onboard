@@ -142,6 +142,10 @@ export default function LoginPage() {
           회원가입
         </Link>
       </div>
+
+      <Link to="/privacy" className="w-full text-center text-[12px] text-[#9ca3af]">
+        개인정보처리방침
+      </Link>
     </AuthCard>
   );
 }

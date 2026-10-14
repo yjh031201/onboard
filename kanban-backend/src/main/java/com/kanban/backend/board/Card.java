@@ -1,7 +1,5 @@
 package com.kanban.backend.board;
 
-import com.kanban.backend.user.User;
-import com.kanban.backend.user.UserRole;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -33,8 +31,15 @@ public class Card {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Column(nullable = false, length = 200)
     private String title;
+
+    /** 카드 설명. 없으면 null. */
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
     /** 카드가 들어 있는 컬럼의 id (board_columns.id). */
     @Column(nullable = false, length = 20)
@@ -50,6 +55,10 @@ public class Card {
     @OrderColumn(name = "position")
     @Column(name = "label_id", length = 30, nullable = false)
     private List<String> labelIds = new ArrayList<>();
+
+    /** "기타" 라벨에 직접 적은 글자. 기타 라벨이 안 붙어 있거나 안 적었으면 null. */
+    @Column(name = "custom_label", length = 20)
+    private String customLabel;
 
     /** 마감 일시. 없으면 null. */
     @Column(name = "due_at")
@@ -68,18 +77,22 @@ public class Card {
     private LocalDateTime updatedAt;
 
     public Card(
+            Long projectId,
             String title,
             String status,
             int position,
             List<String> labelIds,
+            String customLabel,
             LocalDateTime dueAt,
             Long createdById,
             String createdByName
     ) {
+        this.projectId = projectId;
         this.title = title;
         this.status = status;
         this.position = position;
         this.labelIds = new ArrayList<>(labelIds);
+        this.customLabel = customLabel;
         this.dueAt = dueAt;
         this.createdById = createdById;
         this.createdByName = createdByName;
@@ -94,25 +107,24 @@ public class Card {
         this.position = position;
     }
 
-    public void changeLabels(List<String> labelIds) {
+    public void changeLabels(List<String> labelIds, String customLabel) {
         this.labelIds.clear();
         this.labelIds.addAll(labelIds);
+        this.customLabel = customLabel;
     }
 
-    /** 라벨이 삭제됐을 때 — 붙어 있었으면 떼고 true. */
+    /** 라벨이 삭제됐을 때 — 붙어 있었으면 떼고 true. "기타" 라벨은 삭제할 수 없으니(LabelService.delete) 여기서
+     *  customLabel을 따로 다룰 필요가 없다. */
     public boolean removeLabel(String labelId) {
         return this.labelIds.remove(labelId);
     }
 
-    public void update(String title, LocalDateTime dueAt) {
+    public void update(String title, String description, LocalDateTime dueAt) {
         this.title = title;
+        this.description = description;
         this.dueAt = dueAt;
     }
 
-    /** 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정·삭제 가능. */
-    public boolean isManageableBy(User user) {
-        return createdById.equals(user.getId()) || user.getRole() != UserRole.MEMBER;
-    }
 
     @jakarta.persistence.PrePersist
     protected void onCreate() {

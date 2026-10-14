@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,14 +25,19 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/api/integrations/drive")
 public class DriveIntegrationController {
 
+    private static final Logger log = LoggerFactory.getLogger(DriveIntegrationController.class);
+
     private final DriveIntegrationService driveIntegrationService;
+    private final IntegrationService integrationService;
     private final String frontendBaseUrl;
 
     public DriveIntegrationController(
             DriveIntegrationService driveIntegrationService,
+            IntegrationService integrationService,
             @Value("${app.frontend-base-url}") String frontendBaseUrl
     ) {
         this.driveIntegrationService = driveIntegrationService;
+        this.integrationService = integrationService;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -39,7 +46,7 @@ public class DriveIntegrationController {
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         String authorizeUrl = driveIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }
@@ -60,6 +67,7 @@ public class DriveIntegrationController {
             driveIntegrationService.handleCallback(code, state, callbackUrl(request));
             response.sendRedirect(redirectTarget("connected", null));
         } catch (Exception e) {
+            log.warn("Google Drive 연동 콜백 처리 실패", e);
             response.sendRedirect(redirectTarget("error", "Google Drive 연동에 실패했어요."));
         }
     }

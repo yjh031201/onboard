@@ -2,15 +2,16 @@ import { useEffect, useState } from "react";
 import { fetchColumns, type ColumnDef } from "../lib/boardColumns";
 import { subscribeTopic } from "../lib/realtime";
 
-/** 보드 컬럼 목록을 불러오고, 이후에는 /topic/columns로 오는 전체 목록(추가/변경/삭제 후)을 그대로 반영한다. */
-export function useBoardColumns() {
+/** 보드 컬럼 목록을 불러오고, 이후에는 /topic/projects/{projectId}/columns로 오는 전체 목록(추가/변경/삭제 후)을 그대로 반영한다. */
+export function useBoardColumns(projectId: number) {
   const [columns, setColumns] = useState<ColumnDef[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
 
-    fetchColumns()
+    fetchColumns(projectId)
       .then((data) => {
         if (!cancelled) setColumns(data);
       })
@@ -21,13 +22,13 @@ export function useBoardColumns() {
         if (!cancelled) setLoading(false);
       });
 
-    const unsubscribe = subscribeTopic<ColumnDef[]>("/topic/columns", setColumns);
+    const unsubscribe = subscribeTopic<ColumnDef[]>(`/topic/projects/${projectId}/columns`, setColumns);
 
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
+  }, [projectId]);
 
   return { columns, loading };
 }

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/cards")
+@RequestMapping("/api/projects/{projectId}/cards")
 public class CardController {
 
     private final CardService cardService;
@@ -31,48 +31,56 @@ public class CardController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CardResponse>> list() {
-        return ResponseEntity.ok(cardService.list());
+    public ResponseEntity<List<CardResponse>> list(@PathVariable Long projectId, @AuthenticationPrincipal User actor) {
+        return ResponseEntity.ok(cardService.list(projectId, actor));
     }
 
     @PostMapping
     public ResponseEntity<CardResponse> create(
+            @PathVariable Long projectId,
             @Valid @RequestBody CreateCardRequest request,
             @AuthenticationPrincipal User actor
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(cardService.create(request, actor));
+        return ResponseEntity.status(HttpStatus.CREATED).body(cardService.create(projectId, request, actor));
     }
 
     @PatchMapping("/{id}/move")
     public ResponseEntity<CardResponse> move(
+            @PathVariable Long projectId,
             @PathVariable Long id,
             @Valid @RequestBody MoveCardRequest request,
             @AuthenticationPrincipal User actor
     ) {
-        return ResponseEntity.ok(cardService.move(id, request, actor));
+        return ResponseEntity.ok(cardService.move(projectId, id, request, actor));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<CardResponse> update(
+            @PathVariable Long projectId,
             @PathVariable Long id,
             @Valid @RequestBody UpdateCardRequest request,
             @AuthenticationPrincipal User actor
     ) {
-        return ResponseEntity.ok(cardService.update(id, request, actor));
+        return ResponseEntity.ok(cardService.update(projectId, id, request, actor));
     }
 
     @PatchMapping("/{id}/label")
     public ResponseEntity<CardResponse> changeLabels(
+            @PathVariable Long projectId,
             @PathVariable Long id,
             @Valid @RequestBody ChangeCardLabelRequest request,
             @AuthenticationPrincipal User actor
     ) {
-        return ResponseEntity.ok(cardService.changeLabels(id, request, actor));
+        return ResponseEntity.ok(cardService.changeLabels(projectId, id, request, actor));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal User actor) {
-        cardService.delete(id, actor);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @AuthenticationPrincipal User actor
+    ) {
+        cardService.delete(projectId, id, actor);
         return ResponseEntity.noContent().build();
     }
 }

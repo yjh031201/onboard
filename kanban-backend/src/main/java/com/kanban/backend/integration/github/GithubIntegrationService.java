@@ -33,6 +33,7 @@ public class GithubIntegrationService {
 
     private final IntegrationRepository integrationRepository;
     private final IntegrationStateStore stateStore;
+    private final IntegrationService integrationService;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
     private final String clientId;
@@ -41,6 +42,7 @@ public class GithubIntegrationService {
     public GithubIntegrationService(
             IntegrationRepository integrationRepository,
             IntegrationStateStore stateStore,
+            IntegrationService integrationService,
             ObjectMapper objectMapper,
             RestClient.Builder restClientBuilder,
             @Value("${integrations.github.client-id}") String clientId,
@@ -48,6 +50,7 @@ public class GithubIntegrationService {
     ) {
         this.integrationRepository = integrationRepository;
         this.stateStore = stateStore;
+        this.integrationService = integrationService;
         this.objectMapper = objectMapper;
         this.restClient = restClientBuilder.build();
         this.clientId = clientId;
@@ -78,7 +81,7 @@ public class GithubIntegrationService {
 
     @Transactional
     public void linkRepo(String owner, String repo, User currentUser) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         Integration integration = requireConnected();
         integration.linkGithubRepo(owner, repo);
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import NotificationToasts from "./NotificationToasts";
+import ArchivedBanner from "./ArchivedBanner";
 import { isLoggedIn } from "../../lib/auth";
 import { connectRealtime, disconnectRealtime } from "../../lib/realtime";
 
@@ -20,6 +21,7 @@ export default function AppLayout() {
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
       <Outlet />
       <NotificationToasts />
+      {isLoggedIn() && <ArchivedBanner />}
     </div>
   );
 }

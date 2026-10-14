@@ -27,9 +27,13 @@ export type CardStatus = string;
 export interface TaskCard {
   id: string;
   title: string;
+  /** 카드 설명. 없으면 null. */
+  description: string | null;
   status: CardStatus;
   /** 붙인 순서대로, 최대 2개 (MAX_CARD_LABELS). */
   labelIds: string[];
+  /** "기타" 라벨에 직접 적은 글자. 기타 라벨이 없거나 안 적었으면 null. */
+  customLabel: string | null;
   /** 마감 일시 "YYYY-MM-DDTHH:mm:ss" (서버 LocalDateTime), 없으면 null. */
   dueAt: string | null;
   createdById: number;
@@ -68,4 +72,3 @@ export interface ScheduleDate {
 }
 
 export type ScheduleCategory = "회의" | "마감" | "이벤트" | "기타";
-

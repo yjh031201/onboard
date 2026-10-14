@@ -2,6 +2,7 @@ package com.kanban.backend.file;
 
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.file.dto.ProjectFileResponse;
+import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRepository;
 import java.util.List;
@@ -21,15 +22,18 @@ public class ProjectFileService {
     private final ProjectFileRepository repository;
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
+    private final ProjectAccessService projectAccessService;
 
     public ProjectFileService(
             ProjectFileRepository repository,
             FileStorageService fileStorageService,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ProjectAccessService projectAccessService
     ) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
         this.userRepository = userRepository;
+        this.projectAccessService = projectAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +74,8 @@ public class ProjectFileService {
     @Transactional
     public void delete(Long id, User currentUser) {
         ProjectFile file = getOrThrow(id);
-        if (!file.isDeletableBy(currentUser)) {
+        boolean isAdmin = projectAccessService.isAdminInAnyProject(currentUser);
+        if (!file.isDeletableBy(currentUser, isAdmin)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인이 올린 파일만 삭제할 수 있습니다.");
         }
         fileStorageService.delete(file.getFileKey());

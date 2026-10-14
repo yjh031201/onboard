@@ -14,7 +14,8 @@ interface PersonalSettingsModalProps {
 
 export default function PersonalSettingsModal({ user, onClose, onUpdated }: PersonalSettingsModalProps) {
   const [name, setName] = useState(user.name);
-  const [phone, setPhone] = useState(user.phone);
+  // 소셜 로그인 계정은 phone이 null일 수 있어서(controlled input에 null을 그대로 넣으면 안 됨) 빈 문자열로.
+  const [phone, setPhone] = useState(user.phone ?? "");
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileSubmitting, setProfileSubmitting] = useState(false);

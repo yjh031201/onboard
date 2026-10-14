@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,14 +24,19 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/api/integrations/slack")
 public class SlackIntegrationController {
 
+    private static final Logger log = LoggerFactory.getLogger(SlackIntegrationController.class);
+
     private final SlackIntegrationService slackIntegrationService;
+    private final IntegrationService integrationService;
     private final String frontendBaseUrl;
 
     public SlackIntegrationController(
             SlackIntegrationService slackIntegrationService,
+            IntegrationService integrationService,
             @Value("${app.frontend-base-url}") String frontendBaseUrl
     ) {
         this.slackIntegrationService = slackIntegrationService;
+        this.integrationService = integrationService;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -38,7 +45,7 @@ public class SlackIntegrationController {
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         String authorizeUrl = slackIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }
@@ -59,13 +66,14 @@ public class SlackIntegrationController {
             slackIntegrationService.handleCallback(code, state, callbackUrl(request));
             response.sendRedirect(redirectTarget("connected", null));
         } catch (Exception e) {
+            log.warn("Slack 연동 콜백 처리 실패", e);
             response.sendRedirect(redirectTarget("error", "Slack 연동에 실패했어요."));
         }
     }
 
     @PostMapping("/test")
     public ResponseEntity<Void> test(@AuthenticationPrincipal User currentUser) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         slackIntegrationService.sendTestMessage();
         return ResponseEntity.noContent().build();
     }

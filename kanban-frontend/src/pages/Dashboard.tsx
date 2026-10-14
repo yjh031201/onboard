@@ -4,6 +4,7 @@ import CalendarWidget from "../components/dashboard/CalendarWidget";
 import KanbanBoard from "../components/dashboard/KanbanBoard";
 import ProgressCards from "../components/dashboard/ProgressCards";
 import TeamPresenceWidget from "../components/dashboard/TeamPresenceWidget";
+import { useProjectId } from "../hooks/useProjectId";
 import { useBoardColumns } from "../hooks/useBoardColumns";
 import { useKanbanBoard } from "../hooks/useKanbanBoard";
 
@@ -27,9 +28,10 @@ function writePanelCollapsed(collapsed: boolean): void {
 }
 
 export default function Dashboard() {
+  const projectId = useProjectId();
   // 진행 현황 카드·칸반·캘린더가 같은 데이터를 보도록 한 번만 불러와서 나눠 준다.
-  const { tasks, loading } = useKanbanBoard();
-  const { columns } = useBoardColumns();
+  const { tasks, loading } = useKanbanBoard(projectId);
+  const { columns } = useBoardColumns(projectId);
   const [panelCollapsed, setPanelCollapsed] = useState(readPanelCollapsed);
 
   const togglePanel = () => {
@@ -66,10 +68,10 @@ export default function Dashboard() {
               « 접기
             </button>
             <CalendarWidget cards={tasks} />
-            <TeamPresenceWidget />
+            <TeamPresenceWidget projectId={projectId} />
           </div>
         )}
-        <KanbanBoard columns={columns} tasks={tasks} loading={loading} />
+        <KanbanBoard projectId={projectId} columns={columns} tasks={tasks} loading={loading} />
       </div>
     </PageShell>
   );

@@ -28,7 +28,8 @@ public class DriveIntegrationService {
 
     private static final String AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
-    private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+    // oauth2/v2/userinfo는 email 스코프가 있어야 해서 drive.readonly 토큰으로는 401이 난다 — Drive API로 계정 이메일을 얻는다.
+    private static final String ABOUT_URL = "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)";
     private static final String FILES_URL = "https://www.googleapis.com/drive/v3/files"
             + "?pageSize=20&fields=files(id,name,webViewLink,mimeType,modifiedTime)&orderBy=modifiedTime desc";
     private static final String SCOPE = "https://www.googleapis.com/auth/drive.readonly";
@@ -150,15 +151,15 @@ public class DriveIntegrationService {
     }
 
     private String fetchEmail(String accessToken) {
-        String body = restClient.get()
-                .uri(USERINFO_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .retrieve()
-                .body(String.class);
         try {
-            return objectMapper.readTree(body).path("email").asText("Google Drive");
+            String body = restClient.get()
+                    .uri(ABOUT_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .body(String.class);
+            return objectMapper.readTree(body).path("user").path("emailAddress").asText("Google Drive");
         } catch (Exception e) {
-            return "Google Drive";
+            return "Google Drive"; // 표시용 이름이라 못 가져와도 연동 자체는 진행한다.
         }
     }
 

@@ -1,0 +1,33 @@
+# 무료 VM 배포용 override — 루트 docker-compose.prod.yml 위에 겹쳐서 쓴다.
+#   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.server.yml up -d --build
+# 바깥으로는 Caddy(80/443)만 열고, 백엔드·프론트는 내부 네트워크로만 연결한다.
+
+services:
+  backend:
+    ports: !reset []
+    environment:
+      REALTIME_ALLOWED_ORIGIN: https://${SITE_DOMAIN}
+
+  frontend:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: kanban-caddy
+    restart: unless-stopped
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  caddy-data:
+  caddy-config:

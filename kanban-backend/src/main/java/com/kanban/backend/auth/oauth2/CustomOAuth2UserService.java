@@ -34,16 +34,28 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                     new OAuth2Error("email_not_verified"), "이메일 인증이 확인되지 않아 로그인할 수 없습니다.");
         }
 
-        User user = resolveUser(info);
+        User user = resolveUser(info, registrationId);
         return new OAuth2UserPrincipal(user, oAuth2User.getAttributes());
     }
 
-    private User resolveUser(OAuthUserInfo info) {
+    private User resolveUser(OAuthUserInfo info, String registrationId) {
         return userRepository.findByProviderAndProviderId(info.provider(), info.providerId())
                 .orElseGet(() -> userRepository.findByEmail(info.email())
                         .map(existing -> linkOrReject(existing, info))
-                        .orElseGet(() -> userRepository.save(
-                                new User(info.email(), info.name(), info.provider(), info.providerId()))));
+                        .orElseGet(() -> createUser(info, registrationId)));
+    }
+
+    /**
+     * registrationId가 "google-guest"(=게스트로 이용 버튼으로 들어온 경우)일 때만 신규 계정을
+     * 게스트로 만든다 — 이미 있는 계정을 찾아 연결(link)하는 경로는 여기 안 타니, 정회원이 나중에
+     * 게스트 버튼을 눌러도 격하되지 않는다.
+     */
+    private User createUser(OAuthUserInfo info, String registrationId) {
+        User user = new User(info.email(), info.name(), info.provider(), info.providerId());
+        if ("google-guest".equals(registrationId)) {
+            user.markAsGuest();
+        }
+        return userRepository.save(user);
     }
 
     /** 이미 같은 이메일로 가입된 계정이 있으면 로컬 계정에 한해서만 연결(link)해준다. */

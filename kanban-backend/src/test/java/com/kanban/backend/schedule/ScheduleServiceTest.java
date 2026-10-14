@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.schedule.dto.ScheduleCreateRequest;
 import com.kanban.backend.schedule.dto.ScheduleUpdateRequest;
 import com.kanban.backend.user.AuthProvider;
@@ -26,12 +27,14 @@ class ScheduleServiceTest {
     private static final LocalDate DATE = LocalDate.of(2026, 9, 24);
 
     private ScheduleRepository repository;
+    private ProjectAccessService projectAccessService;
     private ScheduleService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(ScheduleRepository.class);
-        service = new ScheduleService(repository);
+        projectAccessService = mock(ProjectAccessService.class);
+        service = new ScheduleService(repository, projectAccessService);
         when(repository.save(any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -115,6 +118,7 @@ class ScheduleServiceTest {
     @Test
     void update_allowsAdminOnOthersSchedule() {
         when(repository.findById(1L)).thenReturn(Optional.of(scheduleOwnedBy(1L)));
+        when(projectAccessService.isAdminInAnyProject(any())).thenReturn(true);
 
         var response = service.update(1L, updateRequest(), userWithId(2L, UserRole.ADMIN));
 

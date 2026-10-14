@@ -1,6 +1,7 @@
 package com.kanban.backend.schedule;
 
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.schedule.dto.ScheduleCreateRequest;
 import com.kanban.backend.schedule.dto.ScheduleResponse;
 import com.kanban.backend.schedule.dto.ScheduleUpdateRequest;
@@ -16,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ScheduleService {
 
     private final ScheduleRepository repository;
+    private final ProjectAccessService projectAccessService;
 
-    public ScheduleService(ScheduleRepository repository) {
+    public ScheduleService(ScheduleRepository repository, ProjectAccessService projectAccessService) {
         this.repository = repository;
+        this.projectAccessService = projectAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -73,7 +76,8 @@ public class ScheduleService {
     }
 
     private void requireEditable(Schedule schedule, User user) {
-        if (!schedule.isEditableBy(user)) {
+        boolean isAdmin = projectAccessService.isAdminInAnyProject(user);
+        if (!schedule.isEditableBy(user, isAdmin)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인이 등록한 일정만 수정/삭제할 수 있습니다.");
         }
     }

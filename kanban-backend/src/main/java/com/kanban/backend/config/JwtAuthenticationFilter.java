@@ -42,10 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(PREFIX.length());
             Optional<Long> userId = jwtTokenProvider.parseUserId(token);
 
-            // 세션 정책이 IF_REQUIRED(OAuth2 로그인용)라 이전 요청에서 세션에 저장된 오래된
-            // 인증 정보가 남아있을 수 있다 — Bearer 토큰이 있으면 그 정보를 신뢰하지 않고
-            // 항상 토큰 기준으로 새로 인증해서, 권한 변경이 바로 반영되게 한다.
-            if (userId.isPresent()) {
+            if (userId.isPresent() && SecurityContextHolder.getContext().getAuthentication() == null) {
                 userRepository.findById(userId.get()).ifPresent(this::authenticate);
             }
         }

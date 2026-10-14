@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/timeline")
+@RequestMapping("/api/projects/{projectId}/timeline")
 public class TimelineController {
 
     private final TimelineService timelineService;
@@ -24,13 +24,21 @@ public class TimelineController {
 
     /** Recent activity history, most recent first — initial page load, before live WS updates take over. */
     @GetMapping
-    public ResponseEntity<List<TimelineEventResponse>> recent(@RequestParam(defaultValue = "50") int limit) {
-        return ResponseEntity.ok(timelineService.recent(limit));
+    public ResponseEntity<List<TimelineEventResponse>> recent(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal User actor,
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        return ResponseEntity.ok(timelineService.recent(projectId, actor, limit));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal User actor) {
-        timelineService.delete(id, actor);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @AuthenticationPrincipal User actor
+    ) {
+        timelineService.delete(projectId, id, actor);
         return ResponseEntity.noContent().build();
     }
 }

@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,14 +29,19 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/api/integrations/github")
 public class GithubIntegrationController {
 
+    private static final Logger log = LoggerFactory.getLogger(GithubIntegrationController.class);
+
     private final GithubIntegrationService githubIntegrationService;
+    private final IntegrationService integrationService;
     private final String frontendBaseUrl;
 
     public GithubIntegrationController(
             GithubIntegrationService githubIntegrationService,
+            IntegrationService integrationService,
             @Value("${app.frontend-base-url}") String frontendBaseUrl
     ) {
         this.githubIntegrationService = githubIntegrationService;
+        this.integrationService = integrationService;
         this.frontendBaseUrl = frontendBaseUrl;
     }
 
@@ -43,7 +50,7 @@ public class GithubIntegrationController {
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        IntegrationService.requireAdmin(currentUser);
+        integrationService.requireAdmin(currentUser);
         String authorizeUrl = githubIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }
@@ -64,6 +71,7 @@ public class GithubIntegrationController {
             githubIntegrationService.handleCallback(code, state, callbackUrl(request));
             response.sendRedirect(redirectTarget("connected", null));
         } catch (Exception e) {
+            log.warn("GitHub 연동 콜백 처리 실패", e);
             response.sendRedirect(redirectTarget("error", "GitHub 연동에 실패했어요."));
         }
     }

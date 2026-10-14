@@ -8,7 +8,9 @@ record OAuthUserInfo(AuthProvider provider, String providerId, String email, Str
 
     static OAuthUserInfo of(String registrationId, Map<String, Object> attributes) {
         return switch (registrationId) {
-            case "google" -> ofGoogle(attributes);
+            // google-guest는 "게스트로 이용" 버튼 전용 진입점이지만 응답 모양은 google과 완전히 같다
+            // (application.yml에서 provider: google로 같은 스키마를 그대로 쓰기 때문).
+            case "google", "google-guest" -> ofGoogle(attributes);
             case "naver" -> ofNaver(attributes);
             default -> throw new IllegalArgumentException("지원하지 않는 로그인 제공자입니다: " + registrationId);
         };

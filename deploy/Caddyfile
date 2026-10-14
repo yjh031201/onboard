@@ -1,0 +1,10 @@
+# 서버 앞단 리버스 프록시 — HTTPS 인증서(Let's Encrypt)를 자동으로 발급·갱신한다.
+# 프론트와 백엔드를 같은 도메인으로 묶어서, refresh token 쿠키(SameSite=Lax)가 그대로 동작하게 한다.
+{$SITE_DOMAIN} {
+	encode gzip
+
+	@backend path /api/* /ws /ws/* /oauth2/* /login/oauth2/*
+	reverse_proxy @backend backend:8080
+
+	reverse_proxy frontend:80
+}
