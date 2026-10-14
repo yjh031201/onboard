@@ -9,12 +9,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 외부 서비스 하나당 한 행 — 이 프로젝트는 단일 워크스페이스라 팀/보드 단위 구분이 필요 없다.
+ * 프로젝트 하나에 외부 서비스 하나당 한 행 — (project_id, provider)가 유니크.
+ * 프로젝트마다 자기 GitHub 저장소·Slack 워크스페이스·Google Drive를 따로 연결한다.
  * accessToken/refreshToken은 이 앱의 다른 토큰들과 동일한 보안 수준(평문 저장, DB 접근 자체가
  * 신뢰 경계)으로 둔다 — RefreshTokenStore도 같은 방식.
  */
@@ -28,8 +30,11 @@ public class Integration {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, unique = true, length = 30)
+    @Column(nullable = false, length = 30)
     private IntegrationProvider provider;
 
     @Column(name = "access_token", nullable = false, length = 1000)
@@ -63,12 +68,26 @@ public class Integration {
     @Column(name = "connected_at", nullable = false)
     private LocalDateTime connectedAt;
 
-    public Integration(IntegrationProvider provider, String accessToken, String accountLabel, Long connectedById) {
+    public Integration(Long projectId, IntegrationProvider provider, String accessToken, String accountLabel, Long connectedById) {
+        this.projectId = projectId;
         this.provider = provider;
         this.accessToken = accessToken;
         this.accountLabel = accountLabel;
         this.connectedById = connectedById;
         this.connectedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 다시 연결했을 때 — 토큰만 바꾸면 화면에는 처음 연결한 사람의 계정이 그대로 남는다.
+     * 연결한 계정·사람·시각을 새로 기록하고, 다른 계정으로 바뀌었는지를 돌려준다.
+     */
+    public boolean reconnect(String accessToken, String accountLabel, Long connectedById) {
+        boolean accountChanged = !Objects.equals(this.accountLabel, accountLabel);
+        this.accessToken = accessToken;
+        this.accountLabel = accountLabel;
+        this.connectedById = connectedById;
+        this.connectedAt = LocalDateTime.now();
+        return accountChanged;
     }
 
     public void updateTokens(String accessToken, String refreshToken, LocalDateTime tokenExpiresAt) {
@@ -82,6 +101,11 @@ public class Integration {
     public void linkGithubRepo(String owner, String repo) {
         this.githubOwner = owner;
         this.githubRepo = repo;
+    }
+
+    public void clearGithubRepo() {
+        this.githubOwner = null;
+        this.githubRepo = null;
     }
 
     public void setSlackWebhook(String webhookUrl, String channel) {

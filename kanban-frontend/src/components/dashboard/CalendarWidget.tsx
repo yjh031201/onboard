@@ -3,6 +3,7 @@ import { buildMonthGrid, getWeekdayLabels } from "../../utils/calendar";
 import type { ScheduleDate, TaskCard } from "../../types/dashboard";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
+import { isProjectAdmin, useMyProjectRole } from "../../hooks/useMyProjectRole";
 import {
   CATEGORY_LABELS,
   SCHEDULE_COLORS,
@@ -82,13 +83,16 @@ type ModalState = { mode: "add" } | { mode: "edit"; schedule: Schedule } | null;
 const CARD_DUE_COLOR = "#ef4444";
 
 interface CalendarWidgetProps {
+  /** 일정은 프로젝트마다 따로 저장된다. */
+  projectId: number;
   /** 마감일이 있는 칸반 카드도 해당 날짜에 표시한다. */
   cards?: TaskCard[];
 }
 
-export default function CalendarWidget({ cards = [] }: CalendarWidgetProps) {
+export default function CalendarWidget({ projectId, cards = [] }: CalendarWidgetProps) {
   const [today] = useState(todayDate);
   const currentUser = getStoredUser();
+  const isAdmin = isProjectAdmin(useMyProjectRole(projectId));
 
   const [viewYear, setViewYear] = useState(today.year);
   const [viewMonth, setViewMonth] = useState(today.monthIndex);
@@ -99,7 +103,7 @@ export default function CalendarWidget({ cards = [] }: CalendarWidgetProps) {
 
   useEffect(() => {
     let cancelled = false;
-    listMonthSchedules(viewYear, viewMonth)
+    listMonthSchedules(projectId, viewYear, viewMonth)
       .then((data) => {
         if (cancelled) return;
         setSchedules(data);
@@ -113,7 +117,7 @@ export default function CalendarWidget({ cards = [] }: CalendarWidgetProps) {
     return () => {
       cancelled = true;
     };
-  }, [viewYear, viewMonth]);
+  }, [projectId, viewYear, viewMonth]);
 
   const weeks = useMemo(() => buildMonthGrid(viewYear, viewMonth, { today }), [viewYear, viewMonth, today]);
 
@@ -137,11 +141,8 @@ export default function CalendarWidget({ cards = [] }: CalendarWidgetProps) {
   const selectedDueCards = dueCardsOn(selectedIso);
   const selectedDate: ScheduleDate = { year: viewYear, monthIndex: viewMonth, date: selectedDay };
 
-  // 작성자 본인이거나 OWNER/ADMIN이면 수정/삭제 가능 (서버에서도 동일하게 검증됨).
-  const canEdit = (schedule: Schedule) =>
-    schedule.createdBy === currentUser?.id ||
-    currentUser?.role === "OWNER" ||
-    currentUser?.role === "ADMIN";
+  // 작성자 본인이거나 이 프로젝트의 OWNER/ADMIN이면 수정/삭제 가능 (서버에서도 동일하게 검증됨).
+  const canEdit = (schedule: Schedule) => schedule.createdBy === currentUser?.id || isAdmin;
 
   const goToMonth = (delta: number) => {
     const next = new Date(viewYear, viewMonth + delta, 1);
@@ -326,6 +327,7 @@ export default function CalendarWidget({ cards = [] }: CalendarWidgetProps) {
 
       {modal && (
         <ScheduleModal
+          projectId={projectId}
           date={selectedDate}
           schedule={modal.mode === "edit" ? modal.schedule : undefined}
           canEdit={modal.mode === "edit" ? canEdit(modal.schedule) : true}

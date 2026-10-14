@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/integrations")
+@RequestMapping("/api/projects/{projectId}/integrations")
 public class IntegrationController {
 
     private final IntegrationService integrationService;
@@ -22,16 +22,20 @@ public class IntegrationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<IntegrationStatusResponse>> list() {
-        return ResponseEntity.ok(integrationService.list());
+    public ResponseEntity<List<IntegrationStatusResponse>> list(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(integrationService.list(projectId, currentUser));
     }
 
     @DeleteMapping("/{provider}")
     public ResponseEntity<Void> disconnect(
+            @PathVariable Long projectId,
             @PathVariable IntegrationProvider provider,
             @AuthenticationPrincipal User currentUser
     ) {
-        integrationService.disconnect(provider, currentUser);
+        integrationService.disconnect(projectId, provider, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

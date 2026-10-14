@@ -67,7 +67,7 @@ export default function Dashboard() {
             >
               « 접기
             </button>
-            <CalendarWidget cards={tasks} />
+            <CalendarWidget projectId={projectId} cards={tasks} />
             <TeamPresenceWidget projectId={projectId} />
           </div>
         )}

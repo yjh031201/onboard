@@ -50,25 +50,25 @@ export function toIsoDate(year: number, monthIndex: number, date: number): strin
 }
 
 /** 해당 월과 하루라도 겹치는 일정 전부. monthIndex는 JS Date와 같은 0-11, 서버는 1-12를 받음. */
-export function listMonthSchedules(year: number, monthIndex: number): Promise<Schedule[]> {
-  return apiRequest<Schedule[]>(`/api/schedules?year=${year}&month=${monthIndex + 1}`);
+export function listMonthSchedules(projectId: number, year: number, monthIndex: number): Promise<Schedule[]> {
+  return apiRequest<Schedule[]>(`/api/projects/${projectId}/schedules?year=${year}&month=${monthIndex + 1}`);
 }
 
-export function createSchedule(input: ScheduleInput): Promise<Schedule> {
-  return apiRequest<Schedule>("/api/schedules", {
+export function createSchedule(projectId: number, input: ScheduleInput): Promise<Schedule> {
+  return apiRequest<Schedule>(`/api/projects/${projectId}/schedules`, {
     method: "POST",
     body: JSON.stringify(input),
   });
 }
 
 /** 작성자 본인 또는 OWNER/ADMIN만 성공함 (서버에서 검증). */
-export function updateSchedule(id: number, input: ScheduleInput): Promise<Schedule> {
-  return apiRequest<Schedule>(`/api/schedules/${id}`, {
+export function updateSchedule(projectId: number, id: number, input: ScheduleInput): Promise<Schedule> {
+  return apiRequest<Schedule>(`/api/projects/${projectId}/schedules/${id}`, {
     method: "PUT",
     body: JSON.stringify(input),
   });
 }
 
-export function deleteSchedule(id: number): Promise<void> {
-  return apiRequest<void>(`/api/schedules/${id}`, { method: "DELETE" });
+export function deleteSchedule(projectId: number, id: number): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/schedules/${id}`, { method: "DELETE" });
 }

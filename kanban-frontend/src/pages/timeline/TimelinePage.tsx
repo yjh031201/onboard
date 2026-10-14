@@ -1,5 +1,6 @@
 import PageShell from "../../components/layout/PageShell";
 import { useProjectId } from "../../hooks/useProjectId";
+import { isProjectAdmin, useMyProjectRole } from "../../hooks/useMyProjectRole";
 import { useTimelineFeed } from "../../hooks/useTimelineFeed";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
@@ -58,10 +59,10 @@ export default function TimelinePage() {
   const events = useTimelineFeed(projectId);
   const groups = groupByDay(events);
   const currentUser = getStoredUser();
+  const isAdmin = isProjectAdmin(useMyProjectRole(projectId));
 
-  // 본인 기록이거나 OWNER/ADMIN만 삭제 가능 (서버에서도 동일하게 검증됨).
-  const canDelete = (entry: TimelineEventDto) =>
-    entry.actorId === currentUser?.id || currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  // 본인 기록이거나 이 프로젝트의 OWNER/ADMIN만 삭제 가능 (서버에서도 동일하게 검증됨).
+  const canDelete = (entry: TimelineEventDto) => entry.actorId === currentUser?.id || isAdmin;
 
   const removeEntry = (entry: TimelineEventDto) => {
     if (!window.confirm("이 활동 기록을 삭제할까요?")) return;

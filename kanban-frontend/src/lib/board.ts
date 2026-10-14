@@ -130,10 +130,12 @@ export function deleteCard(projectId: number, cardId: string): Promise<void> {
   return apiRequest<void>(`/api/projects/${projectId}/cards/${cardId}`, { method: "DELETE" });
 }
 
-/** 작성자 본인이거나 OWNER/ADMIN만 수정·삭제 가능 (서버에서도 동일하게 검증됨). */
-export function canManageCard(task: TaskCard): boolean {
-  const user = getStoredUser();
-  return task.createdById === user?.id || user?.role === "OWNER" || user?.role === "ADMIN";
+/**
+ * 작성자 본인이거나 이 프로젝트의 OWNER/ADMIN만 수정·삭제 가능 (서버에서도 동일하게 검증됨).
+ * isAdmin은 useMyProjectRole로 구한 이 프로젝트에서의 내 role — 전역 user.role은 항상 MEMBER라 쓰면 안 된다.
+ */
+export function canManageCard(task: TaskCard, isAdmin: boolean): boolean {
+  return task.createdById === getStoredUser()?.id || isAdmin;
 }
 
 /** 라벨 선택 토글 — 이미 있으면 빼고, 없으면 최대 개수 안에서 뒤에 붙인다. */

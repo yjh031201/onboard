@@ -23,6 +23,9 @@ public class ProjectFile {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
+
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
 
@@ -41,7 +44,8 @@ public class ProjectFile {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public ProjectFile(String fileName, String fileKey, long fileSize, String contentType, Long uploadedBy) {
+    public ProjectFile(Long projectId, String fileName, String fileKey, long fileSize, String contentType, Long uploadedBy) {
+        this.projectId = projectId;
         this.fileName = fileName;
         this.fileKey = fileKey;
         this.fileSize = fileSize;
@@ -50,9 +54,8 @@ public class ProjectFile {
     }
 
     /**
-     * 업로더 본인이거나 관리자(OWNER/ADMIN)면 삭제 가능. isAdmin은 users.role(전역, 항상 MEMBER로
-     * 고정됨)이 아니라 ProjectAccessService.isAdminInAnyProject(user) 결과를 서비스 레이어에서
-     * 미리 계산해서 넘겨준다 — 엔티티가 리포지토리를 직접 들고 있지 않게 하려고.
+     * 업로더 본인이거나 이 프로젝트의 관리자(OWNER/ADMIN)면 삭제 가능. isAdmin은 서비스 레이어에서
+     * 이 파일이 속한 프로젝트의 ProjectMember.role로 미리 계산해서 넘겨준다 — 엔티티가 리포지토리를 직접 들고 있지 않게 하려고.
      */
     public boolean isDeletableBy(User user, boolean isAdmin) {
         return uploadedBy.equals(user.getId()) || isAdmin;

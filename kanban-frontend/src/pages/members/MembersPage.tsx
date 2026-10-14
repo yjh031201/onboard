@@ -43,7 +43,7 @@ export default function MembersPage() {
   const [integrationBanner, setIntegrationBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadIntegrations = () => {
-    fetchIntegrations().then(setIntegrations).catch(() => {
+    fetchIntegrations(projectId).then(setIntegrations).catch(() => {
       /* 연동 상태는 부가 정보라, 실패해도 나머지 페이지는 그대로 쓸 수 있게 조용히 둔다. */
     });
   };
@@ -58,8 +58,11 @@ export default function MembersPage() {
   }, [projectId]);
 
   useEffect(() => {
+    // 다른 프로젝트로 옮겨 오면 앞 프로젝트의 연동 상태가 잠깐 보이지 않게 비우고 다시 불러온다.
+    setIntegrations([]);
+    setManagingIntegration(null);
     loadIntegrations();
-  }, []);
+  }, [projectId]);
 
   // OAuth 콜백에서 돌아왔을 때(?integration=github&status=connected) 배너 한 번 띄우고 URL 정리.
   useEffect(() => {
@@ -82,7 +85,7 @@ export default function MembersPage() {
   }, []);
 
   const handleConnect = (provider: IntegrationProvider) => {
-    startConnect(provider).catch((err) => {
+    startConnect(projectId, provider).catch((err) => {
       setIntegrationBanner({
         type: "error",
         text: err instanceof ApiError ? err.message : "연동을 시작하지 못했어요.",
@@ -220,6 +223,7 @@ export default function MembersPage() {
 
       {managingIntegration && (
         <IntegrationManagePopup
+          projectId={projectId}
           status={managingIntegration}
           canManage={canManageMembers}
           onClose={() => setManagingIntegration(null)}

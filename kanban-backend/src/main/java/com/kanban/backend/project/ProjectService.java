@@ -4,6 +4,8 @@ import com.kanban.backend.board.BoardColumn;
 import com.kanban.backend.board.BoardColumnRepository;
 import com.kanban.backend.board.CardRepository;
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.file.ProjectFileService;
+import com.kanban.backend.integration.IntegrationRepository;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
 import com.kanban.backend.project.dto.CreateProjectRequest;
@@ -11,6 +13,7 @@ import com.kanban.backend.project.dto.ProjectResponse;
 import com.kanban.backend.project.dto.UpdateProjectRequest;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
+import com.kanban.backend.schedule.ScheduleRepository;
 import com.kanban.backend.timeline.TimelineEventRepository;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
@@ -30,6 +33,9 @@ public class ProjectService {
     private final LabelRepository labelRepository;
     private final CardRepository cardRepository;
     private final TimelineEventRepository timelineEventRepository;
+    private final IntegrationRepository integrationRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final ProjectFileService projectFileService;
     private final RealtimeEventPublisher realtimeEventPublisher;
 
     public ProjectService(
@@ -40,6 +46,9 @@ public class ProjectService {
             LabelRepository labelRepository,
             CardRepository cardRepository,
             TimelineEventRepository timelineEventRepository,
+            IntegrationRepository integrationRepository,
+            ScheduleRepository scheduleRepository,
+            ProjectFileService projectFileService,
             RealtimeEventPublisher realtimeEventPublisher
     ) {
         this.projectRepository = projectRepository;
@@ -49,6 +58,9 @@ public class ProjectService {
         this.labelRepository = labelRepository;
         this.cardRepository = cardRepository;
         this.timelineEventRepository = timelineEventRepository;
+        this.integrationRepository = integrationRepository;
+        this.scheduleRepository = scheduleRepository;
+        this.projectFileService = projectFileService;
         this.realtimeEventPublisher = realtimeEventPublisher;
     }
 
@@ -124,8 +136,8 @@ public class ProjectService {
     }
 
     /**
-     * 프로젝트를 영구 삭제 — OWNER만. 이 프로젝트의 카드(+라벨 연결)·컬럼·라벨·타임라인·멤버십을 전부 지우고
-     * 프로젝트 자체를 삭제한다. 일정·파일은 아직 프로젝트별로 나뉘어 있지 않아(전역) 건드리지 않는다.
+     * 프로젝트를 영구 삭제 — OWNER만. 이 프로젝트의 카드(+라벨 연결)·컬럼·라벨·타임라인·연동·일정·파일·멤버십을
+     * 전부 지우고 프로젝트 자체를 삭제한다.
      */
     @Transactional
     public void delete(Long projectId, User actor) {
@@ -136,6 +148,9 @@ public class ProjectService {
         boardColumnRepository.deleteAllByProjectId(projectId);
         labelRepository.deleteAllByProjectId(projectId);
         timelineEventRepository.deleteAllByProjectId(projectId);
+        integrationRepository.deleteAllByProjectId(projectId);
+        scheduleRepository.deleteAllByProjectId(projectId);
+        projectFileService.deleteAllInProject(projectId);
         projectMemberRepository.deleteAllByProjectId(projectId);
         projectRepository.deleteById(projectId);
     }

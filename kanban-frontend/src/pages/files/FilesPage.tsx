@@ -4,6 +4,8 @@ import { Divider } from "../../components/ui/Section";
 import Button from "../../components/ui/Button";
 import { ApiError } from "../../lib/api";
 import { getStoredUser } from "../../lib/auth";
+import { useProjectId } from "../../hooks/useProjectId";
+import { isProjectAdmin, useMyProjectRole } from "../../hooks/useMyProjectRole";
 import {
   MAX_FILE_SIZE_BYTES,
   deleteFile,
@@ -50,7 +52,9 @@ function errorMessage(err: unknown, fallback: string): string {
 }
 
 export default function FilesPage() {
+  const projectId = useProjectId();
   const currentUser = getStoredUser();
+  const isAdmin = isProjectAdmin(useMyProjectRole(projectId));
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [files, setFiles] = useState<ProjectFile[]>([]);
@@ -60,15 +64,28 @@ export default function FilesPage() {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    listFiles()
-      .then(setFiles)
-      .catch((err) => setError(errorMessage(err, "파일 목록을 불러오지 못했어요.")))
-      .finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+    // 다른 프로젝트로 옮겨 오면 앞 프로젝트의 파일 목록이 남지 않게 비우고 다시 불러온다.
+    setFiles([]);
+    setLoading(true);
+    setError(null);
+    listFiles(projectId)
+      .then((data) => {
+        if (!cancelled) setFiles(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(errorMessage(err, "파일 목록을 불러오지 못했어요."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
-  // 업로더 본인이거나 OWNER/ADMIN이면 삭제 가능 (서버에서도 동일하게 검증됨).
-  const canDelete = (file: ProjectFile) =>
-    file.uploadedBy === currentUser?.id || currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  // 업로더 본인이거나 이 프로젝트의 OWNER/ADMIN이면 삭제 가능 (서버에서도 동일하게 검증됨).
+  const canDelete = (file: ProjectFile) => file.uploadedBy === currentUser?.id || isAdmin;
 
   const handleUpload = async (selected: FileList | null) => {
     if (!selected || selected.length === 0 || uploading) return;
@@ -83,7 +100,7 @@ export default function FilesPage() {
     setError(null);
     try {
       for (const file of Array.from(selected)) {
-        const uploaded = await uploadFile(file);
+        const uploaded = await uploadFile(projectId, file);
         setFiles((prev) => [uploaded, ...prev]);
       }
     } catch (err) {
@@ -102,14 +119,14 @@ export default function FilesPage() {
 
   const handleDownload = (file: ProjectFile) => {
     setError(null);
-    downloadFile(file).catch((err) => setError(errorMessage(err, "파일을 다운로드하지 못했어요.")));
+    downloadFile(projectId, file).catch((err) => setError(errorMessage(err, "파일을 다운로드하지 못했어요.")));
   };
 
   const handleDelete = async (file: ProjectFile) => {
     if (!window.confirm(`'${file.fileName}' 파일을 삭제할까요?`)) return;
     setError(null);
     try {
-      await deleteFile(file.id);
+      await deleteFile(projectId, file.id);
       setFiles((prev) => prev.filter((f) => f.id !== file.id));
     } catch (err) {
       setError(errorMessage(err, "파일을 삭제하지 못했어요."));

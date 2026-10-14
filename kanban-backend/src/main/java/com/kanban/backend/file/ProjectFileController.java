@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/api/projects/{projectId}/files")
 public class ProjectFileController {
 
     private final ProjectFileService service;
@@ -34,21 +34,29 @@ public class ProjectFileController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProjectFileResponse>> list() {
-        return ResponseEntity.ok(service.list());
+    public ResponseEntity<List<ProjectFileResponse>> list(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(service.list(projectId, currentUser));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProjectFileResponse> upload(
+            @PathVariable Long projectId,
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal User currentUser
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.upload(file, currentUser));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.upload(projectId, file, currentUser));
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> download(@PathVariable Long id) {
-        ProjectFile file = service.getOrThrow(id);
+    public ResponseEntity<Resource> download(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        ProjectFile file = service.getForDownload(projectId, id, currentUser);
         Resource resource = fileStorageService.load(file.getFileKey());
 
         String encodedName = URLEncoder.encode(file.getFileName(), StandardCharsets.UTF_8).replace("+", "%20");
@@ -61,8 +69,12 @@ public class ProjectFileController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
-        service.delete(id, currentUser);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        service.delete(projectId, id, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

@@ -23,6 +23,7 @@ function toTimeInput(time: string | null): string {
 }
 
 interface ScheduleModalProps {
+  projectId: number;
   /** 새 일정 추가 시 시작일/종료일 기본값 (캘린더에서 선택한 날짜). */
   date: ScheduleDate;
   /** 있으면 수정 모드, 없으면 새 일정 추가. */
@@ -35,6 +36,7 @@ interface ScheduleModalProps {
 }
 
 export default function ScheduleModal({
+  projectId,
   date,
   schedule,
   canEdit = true,
@@ -86,7 +88,9 @@ export default function ScheduleModal({
     setSubmitting(true);
     setError(null);
     try {
-      const saved = isEdit ? await updateSchedule(schedule.id, input) : await createSchedule(input);
+      const saved = isEdit
+        ? await updateSchedule(projectId, schedule.id, input)
+        : await createSchedule(projectId, input);
       onSaved(saved);
       onClose();
     } catch (err) {
@@ -100,7 +104,7 @@ export default function ScheduleModal({
     setSubmitting(true);
     setError(null);
     try {
-      await deleteSchedule(schedule.id);
+      await deleteSchedule(projectId, schedule.id);
       onDeleted?.(schedule.id);
       onClose();
     } catch (err) {

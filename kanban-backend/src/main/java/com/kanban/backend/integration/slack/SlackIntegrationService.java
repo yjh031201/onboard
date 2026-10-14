@@ -3,9 +3,11 @@ package com.kanban.backend.integration.slack;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.integration.ConnectState;
 import com.kanban.backend.integration.Integration;
 import com.kanban.backend.integration.IntegrationProvider;
 import com.kanban.backend.integration.IntegrationRepository;
+import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.IntegrationStateStore;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,7 @@ public class SlackIntegrationService {
 
     private final IntegrationRepository integrationRepository;
     private final IntegrationStateStore stateStore;
+    private final IntegrationService integrationService;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
     private final String clientId;
@@ -41,6 +44,7 @@ public class SlackIntegrationService {
     public SlackIntegrationService(
             IntegrationRepository integrationRepository,
             IntegrationStateStore stateStore,
+            IntegrationService integrationService,
             ObjectMapper objectMapper,
             RestClient.Builder restClientBuilder,
             @Value("${integrations.slack.client-id}") String clientId,
@@ -48,14 +52,15 @@ public class SlackIntegrationService {
     ) {
         this.integrationRepository = integrationRepository;
         this.stateStore = stateStore;
+        this.integrationService = integrationService;
         this.objectMapper = objectMapper;
         this.restClient = restClientBuilder.build();
         this.clientId = clientId;
         this.clientSecret = clientSecret;
     }
 
-    public String buildAuthorizeUrl(Long userId, String redirectUri) {
-        String state = stateStore.issue(userId);
+    public String buildAuthorizeUrl(Long userId, Long projectId, String redirectUri) {
+        String state = stateStore.issue(userId, projectId);
         return AUTHORIZE_URL
                 + "?client_id=" + encode(clientId)
                 + "&scope=" + encode(SCOPES)
@@ -64,8 +69,8 @@ public class SlackIntegrationService {
     }
 
     @Transactional
-    public void handleCallback(String code, String state, String redirectUri) {
-        Long userId = stateStore.redeem(state);
+    public void handleCallback(String code, ConnectState state, String redirectUri) {
+        integrationService.requireAdminForCallback(state);
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("client_id", clientId);
@@ -100,22 +105,26 @@ public class SlackIntegrationService {
             throw new ApiException(HttpStatus.BAD_GATEWAY, "Slack에서 필요한 권한(incoming-webhook)을 받지 못했어요.");
         }
 
-        Integration integration = integrationRepository.findByProvider(IntegrationProvider.SLACK)
-                .orElseGet(() -> new Integration(IntegrationProvider.SLACK, accessToken, teamName, userId));
-        integration.updateTokens(accessToken, null, null);
+        Integration integration = integrationRepository
+                .findByProjectIdAndProvider(state.projectId(), IntegrationProvider.SLACK)
+                .orElseGet(() -> new Integration(state.projectId(), IntegrationProvider.SLACK, accessToken, teamName, state.userId()));
+        integration.reconnect(accessToken, teamName, state.userId());
         integration.setSlackWebhook(webhookUrl, channel);
         integrationRepository.save(integration);
     }
 
-    public void sendTestMessage() {
-        Integration integration = integrationRepository.findByProvider(IntegrationProvider.SLACK)
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Slack이 연결되어 있지 않습니다."));
+    public void sendTestMessage(Long projectId) {
+        Integration integration = integrationService.requireConnected(
+                projectId, IntegrationProvider.SLACK, "이 프로젝트에 Slack이 연결되어 있지 않습니다.");
         postToWebhook(integration.getSlackWebhookUrl(), "🔔 칸반보드 Slack 연동 테스트 메시지입니다.");
     }
 
-    /** 카드 이동 등 알림 이벤트 발생 시 호출 — Slack이 연결 안 돼 있거나 전송 실패해도 호출자 흐름을 막지 않는다. */
-    public void notifyIfConnected(String text) {
-        integrationRepository.findByProvider(IntegrationProvider.SLACK).ifPresent(integration -> {
+    /**
+     * 카드 이동 등 알림 이벤트 발생 시 호출 — 그 프로젝트에 연결된 Slack 채널로만 보낸다.
+     * Slack이 연결 안 돼 있거나 전송 실패해도 호출자 흐름을 막지 않는다.
+     */
+    public void notifyIfConnected(Long projectId, String text) {
+        integrationRepository.findByProjectIdAndProvider(projectId, IntegrationProvider.SLACK).ifPresent(integration -> {
             try {
                 postToWebhook(integration.getSlackWebhookUrl(), text);
             } catch (Exception e) {

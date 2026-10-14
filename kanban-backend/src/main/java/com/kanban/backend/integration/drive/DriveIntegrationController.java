@@ -1,5 +1,6 @@
 package com.kanban.backend.integration.drive;
 
+import com.kanban.backend.integration.IntegrationCallbackSupport;
 import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.dto.ConnectUrlResponse;
 import com.kanban.backend.integration.drive.dto.DriveFileResponse;
@@ -7,51 +8,47 @@ import com.kanban.backend.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
-@RequestMapping("/api/integrations/drive")
 public class DriveIntegrationController {
 
-    private static final Logger log = LoggerFactory.getLogger(DriveIntegrationController.class);
+    private static final String SLUG = "drive";
 
     private final DriveIntegrationService driveIntegrationService;
     private final IntegrationService integrationService;
-    private final String frontendBaseUrl;
+    private final IntegrationCallbackSupport callbackSupport;
 
     public DriveIntegrationController(
             DriveIntegrationService driveIntegrationService,
             IntegrationService integrationService,
-            @Value("${app.frontend-base-url}") String frontendBaseUrl
+            IntegrationCallbackSupport callbackSupport
     ) {
         this.driveIntegrationService = driveIntegrationService;
         this.integrationService = integrationService;
-        this.frontendBaseUrl = frontendBaseUrl;
+        this.callbackSupport = callbackSupport;
     }
 
-    @GetMapping("/connect")
+    @GetMapping("/api/projects/{projectId}/integrations/drive/connect")
     public ResponseEntity<ConnectUrlResponse> connect(
+            @PathVariable Long projectId,
             @AuthenticationPrincipal User currentUser,
             HttpServletRequest request
     ) {
-        integrationService.requireAdmin(currentUser);
-        String authorizeUrl = driveIntegrationService.buildAuthorizeUrl(currentUser.getId(), callbackUrl(request));
+        integrationService.requireAdmin(projectId, currentUser);
+        String authorizeUrl = driveIntegrationService.buildAuthorizeUrl(
+                currentUser.getId(), projectId, callbackSupport.callbackUrl(request, SLUG));
         return ResponseEntity.ok(new ConnectUrlResponse(authorizeUrl));
     }
 
-    @GetMapping("/callback")
+    /** Google Cloud Console에 등록된 고정 콜백 주소 — 프로젝트는 state로 되찾는다. */
+    @GetMapping("/api/integrations/drive/callback")
     public void callback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
@@ -59,35 +56,16 @@ public class DriveIntegrationController {
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
-        if (error != null || code == null || state == null) {
-            response.sendRedirect(redirectTarget("error", "Google Drive 연동이 취소되었어요."));
-            return;
-        }
-        try {
-            driveIntegrationService.handleCallback(code, state, callbackUrl(request));
-            response.sendRedirect(redirectTarget("connected", null));
-        } catch (Exception e) {
-            log.warn("Google Drive 연동 콜백 처리 실패", e);
-            response.sendRedirect(redirectTarget("error", "Google Drive 연동에 실패했어요."));
-        }
+        String redirectUri = callbackSupport.callbackUrl(request, SLUG);
+        response.sendRedirect(callbackSupport.handle(SLUG, "Google Drive", code, state, error,
+                (authCode, connectState) -> driveIntegrationService.handleCallback(authCode, connectState, redirectUri)));
     }
 
-    @GetMapping("/files")
-    public ResponseEntity<List<DriveFileResponse>> files() {
-        return ResponseEntity.ok(driveIntegrationService.listFiles());
-    }
-
-    private String callbackUrl(HttpServletRequest request) {
-        return ServletUriComponentsBuilder.fromContextPath(request)
-                .path("/api/integrations/drive/callback")
-                .toUriString();
-    }
-
-    private String redirectTarget(String status, String message) {
-        String url = frontendBaseUrl + "/members?integration=drive&status=" + status;
-        if (message != null) {
-            url += "&message=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
-        }
-        return url;
+    @GetMapping("/api/projects/{projectId}/integrations/drive/files")
+    public ResponseEntity<List<DriveFileResponse>> files(
+            @PathVariable Long projectId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(driveIntegrationService.listFiles(projectId, currentUser));
     }
 }
