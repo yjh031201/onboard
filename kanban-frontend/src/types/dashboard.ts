@@ -39,6 +39,22 @@ export interface TaskCard {
   createdById: number;
   createdByName: string;
   createdAt: string;
+  /** 붙인 GitHub 이슈·Drive 파일 링크, 붙인 순서대로. */
+  attachments: CardAttachment[];
+}
+
+export type AttachmentKind = "GITHUB_ISSUE" | "DRIVE_FILE";
+
+export interface CardAttachment {
+  id: number;
+  kind: AttachmentKind;
+  /** GitHub 이슈는 "owner/repo#번호", Drive 파일은 파일 id. */
+  externalId: string;
+  title: string;
+  url: string;
+  mimeType: string | null;
+  attachedById: number;
+  attachedByName: string;
 }
 
 export interface KanbanColumn {

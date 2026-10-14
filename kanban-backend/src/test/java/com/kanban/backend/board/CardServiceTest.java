@@ -42,7 +42,8 @@ class CardServiceTest {
                 labelRepository,
                 mock(TimelineService.class),
                 mock(RealtimeEventPublisher.class),
-                projectAccessService
+                projectAccessService,
+                mock(CardAttachmentRepository.class)
         );
     }
 

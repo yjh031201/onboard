@@ -17,6 +17,8 @@ import {
 } from "../../lib/board";
 import { CardDescription, CardEditForm, ColumnPicker, LabelPicker, NewCardForm } from "../../components/kanban/CardForms";
 import CardFilterBar from "../../components/kanban/CardFilterBar";
+import { AttachmentList, AttachPopup, GithubImportPopup } from "../../components/kanban/CardAttachments";
+import { useConnectedIntegrations } from "../../hooks/useConnectedIntegrations";
 import { getStoredUser } from "../../lib/auth";
 import { EMPTY_CARD_FILTER, isFilterActive, matchesFilter } from "../../lib/cardFilter";
 import { findCardLabels } from "../../lib/labels";
@@ -34,6 +36,12 @@ export default function KanbanPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [filter, setFilter] = useState(EMPTY_CARD_FILTER);
+  const integrations = useConnectedIntegrations();
+  const canAttach = integrations.githubRepo !== null || integrations.drive;
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+  const [importingIssues, setImportingIssues] = useState(false);
+  // 팝업이 열린 동안 카드가 바뀌면(첨부 추가 등) 최신 카드로 다시 그린다.
+  const attachingTask = tasks.find((task) => task.id === attachingId) ?? null;
 
   // 설정에서 지워진 라벨이 필터에 남아 있으면, 버튼은 사라졌는데 카드만 계속 걸러지므로 뺀다.
   const activeFilter = { ...filter, labelIds: filter.labelIds.filter((id) => labels.some((label) => label.id === id)) };
@@ -83,8 +91,8 @@ export default function KanbanPage() {
 
   // 카드를 누르면 그 카드 안에 "이동할 컬럼" 목록이 열린다 — 드래그하지 않고도 눌러서 옮길 수 있다.
   const toggleMoving = (e: MouseEvent<HTMLDivElement>, task: TaskCard) => {
-    // 카드 안의 버튼(라벨·수정·삭제 등)을 누른 것은 카드를 고른 것으로 치지 않는다.
-    if ((e.target as HTMLElement).closest("button")) return;
+    // 카드 안의 버튼(라벨·수정·삭제 등)이나 첨부 링크를 누른 것은 카드를 고른 것으로 치지 않는다.
+    if ((e.target as HTMLElement).closest("button, a")) return;
     setMovingId(movingId === task.id ? null : task.id);
   };
 
@@ -109,6 +117,18 @@ export default function KanbanPage() {
         shownCount={visibleTasks.length}
         totalCount={tasks.length}
       />
+      {integrations.githubRepo && (
+        <div className="-mt-4 flex w-full justify-end">
+          <button
+            type="button"
+            onClick={() => setImportingIssues(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#374151] hover:bg-[#f9fafb]"
+          >
+            <span>🐙</span>
+            <span>GitHub 이슈 가져오기</span>
+          </button>
+        </div>
+      )}
       <div className="flex h-full w-full flex-1 gap-5 overflow-x-auto">
         {columns.map((column) => {
           const columnTasks = visibleTasks.filter((task) => task.status === column.id);
@@ -205,6 +225,17 @@ export default function KanbanPage() {
                               + 라벨
                             </button>
                           )}
+                          {canAttach && (
+                            <button
+                              type="button"
+                              title="GitHub 이슈·Drive 파일 첨부"
+                              aria-label={`'${task.title}' 카드에 첨부`}
+                              onClick={() => setAttachingId(task.id)}
+                              className="flex size-5 shrink-0 items-center justify-center rounded text-[12px] leading-none text-[#9ca3af] opacity-0 group-hover:opacity-100 hover:bg-[#f0f0f2] hover:text-[#6366f1]"
+                            >
+                              📎
+                            </button>
+                          )}
                           {canManage && (
                             <button
                               type="button"
@@ -233,6 +264,8 @@ export default function KanbanPage() {
                       {task.description && (
                         <CardDescription text={task.description} expanded={movingId === task.id} />
                       )}
+
+                      <AttachmentList projectId={projectId} task={task} />
 
                       {/* 작성자는 항상 왼쪽에, 마감은 있을 때만 오른쪽에 보여 준다. */}
                       <div className="flex w-full items-center justify-between gap-2 pl-[18px]">
@@ -307,6 +340,24 @@ export default function KanbanPage() {
           );
         })}
       </div>
+
+      {attachingTask && (
+        <AttachPopup
+          projectId={projectId}
+          task={attachingTask}
+          integrations={integrations}
+          onClose={() => setAttachingId(null)}
+        />
+      )}
+      {importingIssues && integrations.githubRepo && (
+        <GithubImportPopup
+          projectId={projectId}
+          githubRepo={integrations.githubRepo}
+          columns={columns}
+          tasks={tasks}
+          onClose={() => setImportingIssues(false)}
+        />
+      )}
     </PageShell>
   );
 }
