@@ -9,6 +9,7 @@ import com.kanban.backend.integration.IntegrationProvider;
 import com.kanban.backend.integration.IntegrationRepository;
 import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.IntegrationStateStore;
+import com.kanban.backend.integration.github.dto.GithubIssueDetail;
 import com.kanban.backend.integration.github.dto.GithubIssueResponse;
 import com.kanban.backend.user.User;
 import java.net.URLEncoder;
@@ -107,6 +108,67 @@ public class GithubIntegrationService {
         String body = githubGet("/repos/{owner}/{repo}/issues?state=open&per_page=20",
                 integration.getAccessToken(), integration.getGithubOwner(), integration.getGithubRepo());
         return parseIssues(body);
+    }
+
+    /** 이 프로젝트에 연결된 저장소 "owner/repo" — 이슈를 카드로 가져오거나 첨부할 때 이슈의 고유 id 앞부분으로 쓴다. */
+    @Transactional(readOnly = true)
+    public String linkedRepoFullName(Long projectId) {
+        Integration integration = requireLinkedRepo(projectId);
+        return integration.getGithubOwner() + "/" + integration.getGithubRepo();
+    }
+
+    /**
+     * 이 프로젝트에 연결된 저장소의 이슈 하나 — 제목·본문·주소를 GitHub에서 직접 받는다. PR이면 거절한다.
+     * 권한 체크(프로젝트 멤버)는 호출하는 쪽(CardAttachmentService)이 한다.
+     */
+    @Transactional(readOnly = true)
+    public GithubIssueDetail getIssue(Long projectId, long number) {
+        Integration integration = requireLinkedRepo(projectId);
+
+        String body;
+        try {
+            body = restClient.get()
+                    .uri(API_BASE + "/repos/{owner}/{repo}/issues/{number}",
+                            integration.getGithubOwner(), integration.getGithubRepo(), number)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + integration.getAccessToken())
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException e) {
+            int status = e.getStatusCode().value();
+            if (status == 404 || status == 410) {
+                throw new ApiException(HttpStatus.NOT_FOUND, "GitHub 이슈 #%d을(를) 찾을 수 없어요.".formatted(number));
+            }
+            if (status == 401) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "GitHub 연동이 만료됐어요. 연동을 해제하고 다시 연결해주세요.");
+            }
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 이슈를 불러오지 못했어요.");
+        }
+
+        try {
+            JsonNode node = objectMapper.readTree(body);
+            if (node.has("pull_request")) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "#%d은(는) 이슈가 아니라 PR이에요.".formatted(number));
+            }
+            return new GithubIssueDetail(
+                    node.path("number").asLong(),
+                    node.path("title").asText(""),
+                    node.path("body").asText(""),
+                    node.path("html_url").asText("")
+            );
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 이슈를 불러오지 못했어요.");
+        }
+    }
+
+    private Integration requireLinkedRepo(Long projectId) {
+        Integration integration = integrationService.requireConnected(projectId, IntegrationProvider.GITHUB, NOT_CONNECTED);
+        if (integration.getGithubOwner() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "먼저 연결할 저장소를 설정해주세요.");
+        }
+        return integration;
     }
 
     /** GitHub API GET — 실패 원인을 사용자에게 보여줄 수 있는 메시지로 바꾼다 (그냥 두면 500으로 나간다). */

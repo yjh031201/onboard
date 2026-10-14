@@ -15,9 +15,11 @@ public record CardResponse(
         LocalDateTime dueAt,
         Long createdById,
         String createdByName,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        /** 붙인 GitHub 이슈·Drive 파일, 붙인 순서대로. */
+        List<CardAttachmentResponse> attachments
 ) {
-    public static CardResponse from(Card card) {
+    public static CardResponse from(Card card, List<CardAttachmentResponse> attachments) {
         return new CardResponse(
                 card.getId(),
                 card.getTitle(),
@@ -29,7 +31,8 @@ public record CardResponse(
                 card.getDueAt(),
                 card.getCreatedById(),
                 card.getCreatedByName(),
-                card.getCreatedAt()
+                card.getCreatedAt(),
+                List.copyOf(attachments)
         );
     }
 }

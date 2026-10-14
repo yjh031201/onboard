@@ -1,6 +1,7 @@
 package com.kanban.backend.board;
 
 import com.kanban.backend.board.dto.BoardEvent;
+import com.kanban.backend.board.dto.CardAttachmentResponse;
 import com.kanban.backend.board.dto.CardResponse;
 import com.kanban.backend.board.dto.ChangeCardLabelRequest;
 import com.kanban.backend.board.dto.CreateCardRequest;
@@ -17,7 +18,9 @@ import com.kanban.backend.timeline.TimelineService;
 import com.kanban.backend.user.User;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,7 @@ public class CardService {
     private final TimelineService timelineService;
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final ProjectAccessService projectAccessService;
+    private final CardAttachmentRepository attachmentRepository;
 
     public CardService(
             CardRepository cardRepository,
@@ -38,7 +42,8 @@ public class CardService {
             LabelRepository labelRepository,
             TimelineService timelineService,
             RealtimeEventPublisher realtimeEventPublisher,
-            ProjectAccessService projectAccessService
+            ProjectAccessService projectAccessService,
+            CardAttachmentRepository attachmentRepository
     ) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
@@ -46,6 +51,7 @@ public class CardService {
         this.timelineService = timelineService;
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.projectAccessService = projectAccessService;
+        this.attachmentRepository = attachmentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +81,7 @@ public class CardService {
         );
         broadcastSnapshot(projectId, "CARD_CREATED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     @Transactional
@@ -107,7 +113,7 @@ public class CardService {
         }
         broadcastSnapshot(projectId, "CARD_MOVED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     /** 제목·설명·마감 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
@@ -129,7 +135,7 @@ public class CardService {
         );
         broadcastSnapshot(projectId, "CARD_UPDATED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     @Transactional
@@ -139,7 +145,7 @@ public class CardService {
         List<String> labelIds = validLabelIds(projectId, request.labelIds());
         String customLabel = normalizeCustomLabel(projectId, labelIds, request.customLabel());
         if (labelIds.equals(card.getLabelIds()) && Objects.equals(customLabel, card.getCustomLabel())) {
-            return CardResponse.from(card);
+            return toResponse(card);
         }
 
         card.changeLabels(labelIds, customLabel);
@@ -160,7 +166,7 @@ public class CardService {
         );
         broadcastSnapshot(projectId, "CARD_LABEL_CHANGED", actor.getName());
 
-        return CardResponse.from(card);
+        return toResponse(card);
     }
 
     /** 라벨이 삭제될 때 호출 — 그 라벨이 붙어 있던 카드들에서 떼어낸다. */
@@ -192,8 +198,28 @@ public class CardService {
         broadcastSnapshot(projectId, "CARD_DELETED", actor.getName());
     }
 
+    /**
+     * 외부(GitHub 이슈)에서 가져온 카드를 컬럼 맨 아래에 추가한다. 여러 장을 한 번에 만들 때 쓰므로
+     * 타임라인 기록과 보드 브로드캐스트는 호출하는 쪽(CardAttachmentService)이 마지막에 한 번만 한다.
+     */
+    @Transactional
+    public Card createImported(Long projectId, String columnId, String title, String description, User actor) {
+        BoardColumn column = findColumn(projectId, columnId);
+        int position = cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, column.getId()).size();
+        Card card = new Card(projectId, title, column.getId(), position, List.of(), null, null, actor.getId(), actor.getName());
+        card.update(title, normalizeDescription(description), null);
+        return cardRepository.save(card);
+    }
+
+    /** 이 프로젝트 멤버인지 확인하고 카드를 찾는다 — 첨부 기능(CardAttachmentService)이 쓴다. */
+    @Transactional(readOnly = true)
+    public Card requireCard(Long projectId, Long cardId, User actor) {
+        projectAccessService.requireMember(projectId, actor);
+        return findCard(projectId, cardId);
+    }
+
     /** 작성자 본인이거나, 이 프로젝트에서 OWNER/ADMIN이면 수정·삭제 가능. */
-    private boolean isManageable(Long projectId, Card card, User actor) {
+    public boolean isManageable(Long projectId, Card card, User actor) {
         if (card.getCreatedById().equals(actor.getId())) {
             return true;
         }
@@ -201,9 +227,21 @@ public class CardService {
         return role != null && role != com.kanban.backend.user.UserRole.MEMBER;
     }
 
+    public CardResponse toResponse(Card card) {
+        return CardResponse.from(card, attachmentRepository.findAllByCardIdOrderByIdAsc(card.getId()).stream()
+                .map(CardAttachmentResponse::from)
+                .toList());
+    }
+
+    /** 카드 목록 — 첨부는 프로젝트 단위로 한 번에 읽어 카드별로 나눈다 (카드마다 조회하지 않게). */
     private List<CardResponse> listInternal(Long projectId) {
+        Map<Long, List<CardAttachmentResponse>> attachmentsByCard = attachmentRepository
+                .findAllByProjectIdOrderByIdAsc(projectId).stream()
+                .collect(Collectors.groupingBy(
+                        CardAttachment::getCardId,
+                        Collectors.mapping(CardAttachmentResponse::from, Collectors.toList())));
         return cardRepository.findAllByProjectIdOrderByStatusAscPositionAsc(projectId).stream()
-                .map(CardResponse::from)
+                .map(card -> CardResponse.from(card, attachmentsByCard.getOrDefault(card.getId(), List.of())))
                 .toList();
     }
 
@@ -294,7 +332,7 @@ public class CardService {
         return Math.max(0, Math.min(requested, size));
     }
 
-    private void broadcastSnapshot(Long projectId, String eventType, String actorName) {
+    public void broadcastSnapshot(Long projectId, String eventType, String actorName) {
         BoardEvent event = new BoardEvent(eventType, listInternal(projectId), actorName);
         realtimeEventPublisher.publish(RealtimeChannels.boardEvents(projectId), event);
     }
