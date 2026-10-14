@@ -68,7 +68,7 @@ class CardAttachmentServiceTest {
     }
 
     private Card cardWithId(Long id, Long createdById) {
-        Card card = new Card(PROJECT_ID, "카드", "TODO", 0, List.of(), null, null, createdById, "작성자");
+        Card card = new Card(PROJECT_ID, "카드", "TODO", 0, List.of(), null, null, null, null, createdById, "작성자");
         ReflectionTestUtils.setField(card, "id", id);
         return card;
     }

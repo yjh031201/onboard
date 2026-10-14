@@ -11,6 +11,7 @@ import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.IntegrationStateStore;
 import com.kanban.backend.integration.github.dto.GithubIssueDetail;
 import com.kanban.backend.integration.github.dto.GithubIssueResponse;
+import com.kanban.backend.integration.github.dto.GithubRepoResponse;
 import com.kanban.backend.user.User;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -92,9 +93,68 @@ public class GithubIntegrationService {
     public void linkRepo(Long projectId, String owner, String repo, User currentUser) {
         integrationService.requireAdmin(projectId, currentUser);
         Integration integration = integrationService.requireConnected(projectId, IntegrationProvider.GITHUB, NOT_CONNECTED);
-        // 오타로 없는 저장소를 저장해 두면 이슈 조회 때마다 실패하므로, 저장 전에 접근 가능한지 확인한다.
-        githubGet("/repos/{owner}/{repo}", integration.getAccessToken(), owner, repo);
-        integration.linkGithubRepo(owner, repo);
+        // 오타로 없는 저장소를 저장해 두면 이슈 조회 때마다 실패하므로, 저장 전에 접근 가능한지 확인하고
+        // GitHub이 돌려준 정확한 이름(대소문자 포함)으로 저장한다.
+        JsonNode found = readJson(githubGet("/repos/{owner}/{repo}", integration.getAccessToken(), owner, repo));
+        integration.linkGithubRepo(
+                found.path("owner").path("login").asText(owner),
+                found.path("name").asText(repo)
+        );
+    }
+
+    /**
+     * 소유자의 저장소 목록 (최근에 고친 순, 최대 100개) — 저장소 입력칸에서 골라 넣을 수 있게.
+     * 연결한 계정 본인이면 비공개 저장소까지, 조직이면 그 조직에서 볼 수 있는 저장소를, 다른 사용자면 공개 저장소만 보인다.
+     */
+    @Transactional(readOnly = true)
+    public List<GithubRepoResponse> listRepos(Long projectId, String owner, User currentUser) {
+        integrationService.requireAdmin(projectId, currentUser);
+        Integration integration = integrationService.requireConnected(projectId, IntegrationProvider.GITHUB, NOT_CONNECTED);
+        String trimmed = owner == null ? "" : owner.trim();
+        if (trimmed.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "저장소 소유자를 입력해주세요.");
+        }
+
+        String body;
+        try {
+            if (trimmed.equalsIgnoreCase(integration.getAccountLabel())) {
+                body = githubGetRaw("/user/repos?affiliation=owner&sort=updated&per_page=100", integration.getAccessToken());
+            } else {
+                body = listOrgOrUserRepos(integration.getAccessToken(), trimmed);
+            }
+        } catch (RestClientResponseException e) {
+            int status = e.getStatusCode().value();
+            if (status == 404) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "'%s' 소유자를 찾을 수 없어요.".formatted(trimmed));
+            }
+            if (status == 401) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "GitHub 연동이 만료됐어요. 연동을 해제하고 다시 연결해주세요.");
+            }
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "저장소 목록을 불러오지 못했어요.");
+        }
+
+        List<GithubRepoResponse> repos = new ArrayList<>();
+        for (JsonNode node : readJson(body)) {
+            String description = node.path("description").asText("");
+            repos.add(new GithubRepoResponse(
+                    node.path("name").asText(""),
+                    node.path("private").asBoolean(false),
+                    description.isBlank() ? null : description
+            ));
+        }
+        return repos;
+    }
+
+    /** 조직이면 조직 저장소(멤버라면 비공개 포함), 조직이 아니면(404) 그 사용자의 공개 저장소. */
+    private String listOrgOrUserRepos(String accessToken, String owner) {
+        try {
+            return githubGetRaw("/orgs/{owner}/repos?sort=updated&per_page=100", accessToken, owner);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() != 404) {
+                throw e;
+            }
+            return githubGetRaw("/users/{owner}/repos?sort=updated&per_page=100", accessToken, owner);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -171,15 +231,28 @@ public class GithubIntegrationService {
         return integration;
     }
 
+    /** GitHub API GET — 실패하면 RestClientResponseException을 그대로 던진다 (상태 코드별로 직접 처리할 때). */
+    private String githubGetRaw(String path, String accessToken, Object... uriVariables) {
+        return restClient.get()
+                .uri(API_BASE + path, uriVariables)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .retrieve()
+                .body(String.class);
+    }
+
+    private JsonNode readJson(String body) {
+        try {
+            return objectMapper.readTree(body);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 응답을 처리하지 못했어요.");
+        }
+    }
+
     /** GitHub API GET — 실패 원인을 사용자에게 보여줄 수 있는 메시지로 바꾼다 (그냥 두면 500으로 나간다). */
     private String githubGet(String path, String accessToken, Object... uriVariables) {
         try {
-            return restClient.get()
-                    .uri(API_BASE + path, uriVariables)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                    .retrieve()
-                    .body(String.class);
+            return githubGetRaw(path, accessToken, uriVariables);
         } catch (RestClientResponseException e) {
             int status = e.getStatusCode().value();
             if (status == 404) {

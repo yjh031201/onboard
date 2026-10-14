@@ -66,4 +66,16 @@ public class TimelineEvent {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    /**
+     * 회원 탈퇴 시 — 기록은 남기되 누가 했는지는 지운다. message는 "{이름}님이 ..." 형태로 그 시점의
+     * actorName을 앞에 달고 저장되므로(CardService 참고) 그 앞부분도 같이 바꾼다.
+     */
+    public void anonymizeActor(String replacementName) {
+        if (message.startsWith(actorName + "님이")) {
+            String replaced = replacementName + message.substring(actorName.length());
+            message = replaced.length() > 500 ? replaced.substring(0, 500) : replaced;
+        }
+        actorName = replacementName;
+    }
 }

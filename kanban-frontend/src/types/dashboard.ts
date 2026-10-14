@@ -36,6 +36,9 @@ export interface TaskCard {
   customLabel: string | null;
   /** 마감 일시 "YYYY-MM-DDTHH:mm:ss" (서버 LocalDateTime), 없으면 null. */
   dueAt: string | null;
+  /** 담당자 — 카드에는 작성자 대신 담당자가 보인다. 지정 안 했으면 둘 다 null. */
+  assigneeId: number | null;
+  assigneeName: string | null;
   createdById: number;
   createdByName: string;
   createdAt: string;

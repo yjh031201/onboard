@@ -7,10 +7,12 @@ import {
   disconnectIntegration,
   fetchDriveFiles,
   fetchGithubIssues,
+  fetchGithubRepos,
   sendSlackTestMessage,
   setGithubRepo,
   type DriveFile,
   type GithubIssue,
+  type GithubRepo,
   type IntegrationStatus,
 } from "../../lib/integrations";
 
@@ -20,6 +22,8 @@ interface IntegrationManagePopupProps {
   canManage: boolean;
   onClose: () => void;
   onDisconnected: () => void;
+  /** GitHub 저장소를 바꿔 저장한 뒤 — 부모가 연동 상태를 다시 받아 와 이 창의 status를 바꿔 준다. */
+  onRepoSaved: () => void;
 }
 
 const PROVIDER_TITLE: Record<IntegrationStatus["provider"], string> = {
@@ -34,6 +38,7 @@ export default function IntegrationManagePopup({
   canManage,
   onClose,
   onDisconnected,
+  onRepoSaved,
 }: IntegrationManagePopupProps) {
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -75,7 +80,9 @@ export default function IntegrationManagePopup({
 
         <Divider />
 
-        {status.provider === "GITHUB" && <GithubPanel projectId={projectId} status={status} canManage={canManage} />}
+        {status.provider === "GITHUB" && (
+          <GithubPanel projectId={projectId} status={status} canManage={canManage} onRepoSaved={onRepoSaved} />
+        )}
         {status.provider === "SLACK" && <SlackPanel projectId={projectId} canManage={canManage} />}
         {status.provider === "GOOGLE_DRIVE" && <DrivePanel projectId={projectId} />}
 
@@ -101,19 +108,72 @@ export default function IntegrationManagePopup({
   );
 }
 
+/** 저장소 목록을 부르기 전에 소유자 입력이 멈추길 기다리는 시간 — 글자마다 GitHub을 부르지 않게. */
+const REPO_LOOKUP_DELAY_MS = 400;
+
 function GithubPanel({
   projectId,
   status,
   canManage,
+  onRepoSaved,
 }: {
   projectId: number;
   status: IntegrationStatus;
   canManage: boolean;
+  onRepoSaved: () => void;
 }) {
   const [owner, setOwner] = useState(status.detail?.split("/")[0] ?? "");
   const [repo, setRepo] = useState(status.detail?.split("/")[1] ?? "");
+  // 저장 후 연동 상태를 다시 받아 오면(status.detail이 바뀌면) 입력칸도 서버가 저장한 이름으로 맞춘다.
+  const [syncedDetail, setSyncedDetail] = useState(status.detail);
+  if (syncedDetail !== status.detail) {
+    setSyncedDetail(status.detail);
+    setOwner(status.detail?.split("/")[0] ?? "");
+    setRepo(status.detail?.split("/")[1] ?? "");
+  }
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  // 소유자의 저장소 목록 — 어느 소유자 것인지 같이 들고 있어서, 소유자를 바꾸면 예전 목록은 안 보인다.
+  const [repoList, setRepoList] = useState<{ owner: string; repos: GithubRepo[] } | null>(null);
+  const [repoListError, setRepoListError] = useState<{ owner: string; message: string } | null>(null);
+  const [repoFocused, setRepoFocused] = useState(false);
+  const lookupOwner = owner.trim();
+  const ownerRepos = repoList?.owner === lookupOwner ? repoList.repos : null;
+  const ownerReposError = repoListError?.owner === lookupOwner ? repoListError.message : null;
+  const loadingRepos = lookupOwner !== "" && ownerRepos === null && ownerReposError === null;
+  const repoQuery = repo.trim().toLowerCase();
+  const suggestions = ownerRepos?.filter((r) => r.name.toLowerCase().includes(repoQuery)) ?? [];
+
+  useEffect(() => {
+    if (!canManage || !lookupOwner) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      fetchGithubRepos(projectId, lookupOwner)
+        .then((repos) => {
+          if (!cancelled) setRepoList({ owner: lookupOwner, repos });
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setRepoListError({
+              owner: lookupOwner,
+              message: err instanceof ApiError ? err.message : "저장소 목록을 불러오지 못했어요.",
+            });
+          }
+        });
+    }, REPO_LOOKUP_DELAY_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [canManage, projectId, lookupOwner]);
+
+  const pickRepo = (name: string) => {
+    setRepo(name);
+    setSavedMessage(null);
+    setRepoFocused(false);
+  };
 
   const [issues, setIssues] = useState<GithubIssue[]>([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
@@ -134,10 +194,15 @@ function GithubPanel({
 
   const handleSaveRepo = async () => {
     setSaveError(null);
+    setSavedMessage(null);
     setSaving(true);
     try {
       await setGithubRepo(projectId, owner.trim(), repo.trim());
-      loadIssues();
+      setSavedMessage("저장소를 바꿨어요.");
+      // 연동 상태를 다시 받아 오면 위쪽 저장소 표시가 바뀌고, status.detail이 바뀌어 이슈 목록도 새 저장소로 다시 불린다.
+      // 같은 저장소를 다시 저장한 경우에는 detail이 그대로라 여기서 직접 다시 부른다.
+      if (status.detail?.toLowerCase() === `${owner.trim()}/${repo.trim()}`.toLowerCase()) loadIssues();
+      onRepoSaved();
     } catch (err) {
       setSaveError(err instanceof ApiError ? err.message : "저장소 연결에 실패했어요.");
     } finally {
@@ -149,26 +214,87 @@ function GithubPanel({
     <div className="flex w-full flex-col gap-3.5">
       <p className="text-[13px] font-medium text-[#111827]">연결할 저장소</p>
       {canManage ? (
-        <div className="flex w-full items-end gap-2.5">
-          <div className="flex-1">
-            <Field label="소유자" placeholder="owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
+        <div className="flex w-full flex-col gap-2">
+          <div className="flex w-full items-end gap-2.5">
+            <div className="flex-1">
+              <Field
+                label="소유자"
+                placeholder="owner"
+                value={owner}
+                onChange={(e) => {
+                  setOwner(e.target.value);
+                  setSavedMessage(null);
+                }}
+              />
+            </div>
+            <div className="flex-1">
+              <Field
+                label="저장소"
+                placeholder="repo"
+                autoComplete="off"
+                value={repo}
+                onChange={(e) => {
+                  setRepo(e.target.value);
+                  setSavedMessage(null);
+                }}
+                onFocus={() => setRepoFocused(true)}
+                onBlur={() => setRepoFocused(false)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleSaveRepo}
+              disabled={saving || !owner.trim() || !repo.trim()}
+              className="shrink-0 disabled:opacity-60"
+            >
+              {saving ? "저장 중..." : "저장"}
+            </Button>
           </div>
-          <div className="flex-1">
-            <Field label="저장소" placeholder="repo" value={repo} onChange={(e) => setRepo(e.target.value)} />
-          </div>
-          <Button
-            variant="secondary"
-            onClick={handleSaveRepo}
-            disabled={saving || !owner.trim() || !repo.trim()}
-            className="shrink-0 disabled:opacity-60"
-          >
-            {saving ? "저장 중..." : "저장"}
-          </Button>
+
+          {/* 저장소 칸을 누르면 소유자의 저장소 목록이 뜬다. 적은 글자로 걸러지고, 누르면 칸에 들어간다. */}
+          {repoFocused && lookupOwner && (
+            <div className="flex w-full flex-col gap-1 rounded-lg border border-[#e5e7eb] bg-white p-1.5">
+              {loadingRepos && <p className="px-2 py-1.5 text-[12px] text-[#9ca3af]">저장소 목록을 불러오는 중...</p>}
+              {ownerReposError && <p className="px-2 py-1.5 text-[12px] text-[#ef4444]">{ownerReposError}</p>}
+              {ownerRepos && suggestions.length === 0 && (
+                <p className="px-2 py-1.5 text-[12px] text-[#9ca3af]">
+                  {ownerRepos.length === 0 ? `'${lookupOwner}'의 저장소가 없어요.` : "일치하는 저장소가 없어요."}
+                </p>
+              )}
+              {suggestions.length > 0 && (
+                <div className="flex max-h-[200px] flex-col overflow-auto">
+                  {suggestions.map((r) => (
+                    <button
+                      key={r.name}
+                      type="button"
+                      // mousedown 기본 동작을 막아 저장소 칸의 포커스를 유지한다 — 포커스가 빠지면 목록이 먼저 닫혀 눌리지 않는다.
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pickRepo(r.name)}
+                      className={`flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-[#f3f4f6] ${
+                        r.name === repo.trim() ? "bg-[#eeeefe]" : ""
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-[#111827]">
+                        {r.name}
+                        {r.isPrivate && (
+                          <span className="rounded-full border border-[#e5e7eb] px-1.5 text-[10.5px] font-normal text-[#6b7280]">
+                            비공개
+                          </span>
+                        )}
+                      </span>
+                      {r.description && <span className="line-clamp-1 text-[11.5px] text-[#6b7280]">{r.description}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-[12.5px] text-[#6b7280]">{status.detail ?? "아직 설정되지 않았어요."}</p>
       )}
       {saveError && <p className="text-[12.5px] text-[#ef4444]">{saveError}</p>}
+      {savedMessage && <p className="text-[12.5px] text-[#10b981]">{savedMessage}</p>}
 
       <p className="text-[13px] font-medium text-[#111827]">최근 열린 이슈</p>
       {loadingIssues && <p className="text-[12.5px] text-[#9ca3af]">불러오는 중...</p>}

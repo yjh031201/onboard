@@ -21,4 +21,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     );
 
     void deleteAllByProjectId(Long projectId);
+
+    /** 회원 탈퇴 시 — 본인이 만든 일정(모든 프로젝트). */
+    void deleteAllByCreatedBy(Long createdBy);
 }

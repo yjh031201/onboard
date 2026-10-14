@@ -34,7 +34,7 @@ export default function CardFilterBar({ labels, filter, onChange, shownCount, to
           type="search"
           value={filter.query}
           onChange={(e) => onChange({ ...filter, query: e.target.value })}
-          placeholder="제목·설명·작성자 검색"
+          placeholder="제목·설명·담당자 검색"
           aria-label="카드 검색"
           className="w-full min-w-0 bg-transparent text-[13px] text-[#111827] outline-none placeholder:text-[#9ca3af]"
         />
@@ -47,7 +47,7 @@ export default function CardFilterBar({ labels, filter, onChange, shownCount, to
           onClick={() => onChange({ ...filter, mineOnly: !filter.mineOnly })}
           className={`${CHIP_CLASS} ${filter.mineOnly ? CHIP_ON : CHIP_OFF}`}
         >
-          내 카드
+          내 담당
         </button>
         {labels.map((label) => {
           const selected = filter.labelIds.includes(label.id);

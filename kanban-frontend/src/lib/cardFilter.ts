@@ -3,11 +3,11 @@
 import type { TaskCard } from "../types/dashboard";
 
 export interface CardFilter {
-  /** 제목·설명·직접 적은 라벨 또는 작성자 이름에 들어 있는 글자 (대소문자 구분 없음). */
+  /** 제목·설명·직접 적은 라벨 또는 담당자 이름에 들어 있는 글자 (대소문자 구분 없음). */
   query: string;
   /** 고른 라벨 중 하나라도 붙어 있으면 통과. 비어 있으면 라벨로 거르지 않는다. */
   labelIds: string[];
-  /** 내가 작성한 카드만. */
+  /** 내가 담당한 카드만. */
   mineOnly: boolean;
   /** 마감이 지났거나 DUE_SOON_DAYS일 안에 닥치는 카드만. */
   dueSoon: boolean;
@@ -34,14 +34,14 @@ export function matchesFilter(
     !task.title.toLowerCase().includes(query) &&
     !(task.description ?? "").toLowerCase().includes(query) &&
     !(task.customLabel ?? "").toLowerCase().includes(query) &&
-    !task.createdByName.toLowerCase().includes(query)
+    !(task.assigneeName ?? "").toLowerCase().includes(query)
   ) {
     return false;
   }
   if (filter.labelIds.length > 0 && !filter.labelIds.some((id) => task.labelIds.includes(id))) {
     return false;
   }
-  if (filter.mineOnly && task.createdById !== myId) {
+  if (filter.mineOnly && task.assigneeId !== myId) {
     return false;
   }
   if (filter.dueSoon) {

@@ -3,15 +3,18 @@ package com.kanban.backend.integration.slack;
 import com.kanban.backend.integration.IntegrationCallbackSupport;
 import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.dto.ConnectUrlResponse;
+import com.kanban.backend.integration.slack.dto.SlackWebhookRequest;
 import com.kanban.backend.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.io.IOException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -58,6 +61,18 @@ public class SlackIntegrationController {
         String redirectUri = callbackSupport.callbackUrl(request, SLUG);
         response.sendRedirect(callbackSupport.handle(SLUG, "Slack", code, state, error,
                 (authCode, connectState) -> slackIntegrationService.handleCallback(authCode, connectState, redirectUri)));
+    }
+
+    /** OAuth 없이 Slack Incoming Webhook 주소를 붙여 넣어 이 프로젝트에 연결한다. */
+    @PostMapping("/api/projects/{projectId}/integrations/slack/webhook")
+    public ResponseEntity<Void> connectWithWebhook(
+            @PathVariable Long projectId,
+            @Valid @RequestBody SlackWebhookRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        integrationService.requireAdmin(projectId, currentUser);
+        slackIntegrationService.connectWithWebhook(projectId, currentUser.getId(), request.webhookUrl());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/api/projects/{projectId}/integrations/slack/test")
