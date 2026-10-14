@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { subscribeTopic } from "../../lib/realtime";
 import { getNotificationSettings } from "../../lib/notificationSettings";
+import { useProjectId } from "../../hooks/useProjectId";
 import type { TimelineEventDto } from "../../types/dashboard";
 
 interface ToastItem extends TimelineEventDto {
@@ -12,10 +13,11 @@ const TOAST_DURATION_MS = 4000;
 
 /** 서버가 알림 대상(notified: true)으로 표시한 타임라인 이벤트를 실시간 토스트로 띄운다. */
 export default function NotificationToasts() {
+  const projectId = useProjectId();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   useEffect(() => {
-    return subscribeTopic<TimelineEventDto>("/topic/timeline", (event) => {
+    return subscribeTopic<TimelineEventDto>(`/topic/projects/${projectId}/timeline`, (event) => {
       if (!event.notified) return;
       const settings = getNotificationSettings();
       if (event.type === "CARD_MOVED" && !settings.cardMoveNotif) return;
@@ -28,7 +30,7 @@ export default function NotificationToasts() {
         setToasts((prev) => prev.filter((toast) => toast.toastId !== toastId));
       }, TOAST_DURATION_MS);
     });
-  }, []);
+  }, [projectId]);
 
   if (toasts.length === 0) return null;
 
