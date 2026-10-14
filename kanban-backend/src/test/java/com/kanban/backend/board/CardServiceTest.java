@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.kanban.backend.board.dto.ChangeCardLabelRequest;
 import com.kanban.backend.board.dto.UpdateCardRequest;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
@@ -47,7 +48,8 @@ class CardServiceTest {
                 mock(RealtimeEventPublisher.class),
                 projectAccessService,
                 mock(CardAttachmentRepository.class),
-                userRepository
+                userRepository,
+                mock(CardCommentRepository.class)
         );
     }
 

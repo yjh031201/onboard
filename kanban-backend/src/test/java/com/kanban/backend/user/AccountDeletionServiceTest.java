@@ -13,6 +13,7 @@ import com.kanban.backend.auth.RefreshTokenStore;
 import com.kanban.backend.auth.oauth2.OAuthExchangeCodeRepository;
 import com.kanban.backend.board.CardAttachmentRepository;
 import com.kanban.backend.board.CardRepository;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.file.FileStorageService;
 import com.kanban.backend.file.ProjectFile;
@@ -86,6 +87,7 @@ class AccountDeletionServiceTest {
                 mock(OAuthExchangeCodeRepository.class),
                 cardRepository,
                 mock(CardAttachmentRepository.class),
+                mock(CardCommentRepository.class),
                 timelineEventRepository,
                 refreshTokenStore
         );

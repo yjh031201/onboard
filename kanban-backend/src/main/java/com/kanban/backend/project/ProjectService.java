@@ -3,6 +3,7 @@ package com.kanban.backend.project;
 import com.kanban.backend.board.BoardColumn;
 import com.kanban.backend.board.BoardColumnRepository;
 import com.kanban.backend.board.CardRepository;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.file.ProjectFileService;
 import com.kanban.backend.integration.IntegrationRepository;
@@ -32,6 +33,7 @@ public class ProjectService {
     private final BoardColumnRepository boardColumnRepository;
     private final LabelRepository labelRepository;
     private final CardRepository cardRepository;
+    private final CardCommentRepository commentRepository;
     private final TimelineEventRepository timelineEventRepository;
     private final IntegrationRepository integrationRepository;
     private final ScheduleRepository scheduleRepository;
@@ -45,6 +47,7 @@ public class ProjectService {
             BoardColumnRepository boardColumnRepository,
             LabelRepository labelRepository,
             CardRepository cardRepository,
+            CardCommentRepository commentRepository,
             TimelineEventRepository timelineEventRepository,
             IntegrationRepository integrationRepository,
             ScheduleRepository scheduleRepository,
@@ -57,6 +60,7 @@ public class ProjectService {
         this.boardColumnRepository = boardColumnRepository;
         this.labelRepository = labelRepository;
         this.cardRepository = cardRepository;
+        this.commentRepository = commentRepository;
         this.timelineEventRepository = timelineEventRepository;
         this.integrationRepository = integrationRepository;
         this.scheduleRepository = scheduleRepository;
@@ -144,6 +148,7 @@ public class ProjectService {
         findOrThrow(projectId);
         projectAccessService.requireOwner(projectId, actor);
 
+        commentRepository.deleteAllByProjectId(projectId);
         cardRepository.deleteAllByProjectId(projectId);
         boardColumnRepository.deleteAllByProjectId(projectId);
         labelRepository.deleteAllByProjectId(projectId);

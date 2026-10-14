@@ -7,6 +7,7 @@ import com.kanban.backend.board.dto.ChangeCardLabelRequest;
 import com.kanban.backend.board.dto.CreateCardRequest;
 import com.kanban.backend.board.dto.MoveCardRequest;
 import com.kanban.backend.board.dto.UpdateCardRequest;
+import com.kanban.backend.comment.CardCommentRepository;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.label.Label;
 import com.kanban.backend.label.LabelRepository;
@@ -18,6 +19,7 @@ import com.kanban.backend.timeline.TimelineService;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +39,7 @@ public class CardService {
     private final ProjectAccessService projectAccessService;
     private final CardAttachmentRepository attachmentRepository;
     private final UserRepository userRepository;
+    private final CardCommentRepository commentRepository;
 
     public CardService(
             CardRepository cardRepository,
@@ -46,7 +49,8 @@ public class CardService {
             RealtimeEventPublisher realtimeEventPublisher,
             ProjectAccessService projectAccessService,
             CardAttachmentRepository attachmentRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            CardCommentRepository commentRepository
     ) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
@@ -56,6 +60,7 @@ public class CardService {
         this.projectAccessService = projectAccessService;
         this.attachmentRepository = attachmentRepository;
         this.userRepository = userRepository;
+        this.commentRepository = commentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -200,6 +205,7 @@ public class CardService {
         }
 
         String status = card.getStatus();
+        commentRepository.deleteAllByCardId(cardId);
         cardRepository.delete(card);
 
         List<Card> column = new ArrayList<>(cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, status));
@@ -239,20 +245,31 @@ public class CardService {
     }
 
     public CardResponse toResponse(Card card) {
-        return CardResponse.from(card, attachmentRepository.findAllByCardIdOrderByIdAsc(card.getId()).stream()
-                .map(CardAttachmentResponse::from)
-                .toList());
+        return CardResponse.from(
+                card,
+                attachmentRepository.findAllByCardIdOrderByIdAsc(card.getId()).stream()
+                        .map(CardAttachmentResponse::from)
+                        .toList(),
+                commentRepository.countByCardId(card.getId()));
     }
 
-    /** 카드 목록 — 첨부는 프로젝트 단위로 한 번에 읽어 카드별로 나눈다 (카드마다 조회하지 않게). */
+    /** 카드 목록 — 첨부·댓글 수는 프로젝트 단위로 한 번에 읽어 카드별로 나눈다 (카드마다 조회하지 않게). */
     private List<CardResponse> listInternal(Long projectId) {
         Map<Long, List<CardAttachmentResponse>> attachmentsByCard = attachmentRepository
                 .findAllByProjectIdOrderByIdAsc(projectId).stream()
                 .collect(Collectors.groupingBy(
                         CardAttachment::getCardId,
                         Collectors.mapping(CardAttachmentResponse::from, Collectors.toList())));
+        // 카드마다 따로 세지 않고 한 번에 센다 — 스냅샷은 카드가 바뀔 때마다 나간다.
+        Map<Long, Long> commentCounts = new HashMap<>();
+        for (Object[] row : commentRepository.countByCardInProject(projectId)) {
+            commentCounts.put((Long) row[0], (Long) row[1]);
+        }
         return cardRepository.findAllByProjectIdOrderByStatusAscPositionAsc(projectId).stream()
-                .map(card -> CardResponse.from(card, attachmentsByCard.getOrDefault(card.getId(), List.of())))
+                .map(card -> CardResponse.from(
+                        card,
+                        attachmentsByCard.getOrDefault(card.getId(), List.of()),
+                        commentCounts.getOrDefault(card.getId(), 0L)))
                 .toList();
     }
 
@@ -355,6 +372,7 @@ public class CardService {
         return Math.max(0, Math.min(requested, size));
     }
 
+    /** 보드 전체 스냅샷을 보낸다 — 카드 말고 카드에 딸린 것(댓글 수 등)이 바뀌었을 때 CardCommentService도 부른다. */
     public void broadcastSnapshot(Long projectId, String eventType, String actorName) {
         BoardEvent event = new BoardEvent(eventType, listInternal(projectId), actorName);
         realtimeEventPublisher.publish(RealtimeChannels.boardEvents(projectId), event);
