@@ -5,5 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> {
 
-    List<ProjectFile> findAllByOrderByCreatedAtDesc();
+    List<ProjectFile> findAllByProjectIdOrderByCreatedAtDesc(Long projectId);
+
+    List<ProjectFile> findAllByProjectId(Long projectId);
 }

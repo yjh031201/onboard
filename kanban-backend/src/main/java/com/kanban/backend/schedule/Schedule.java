@@ -20,7 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "schedules", indexes = @Index(name = "idx_schedule_date", columnList = "start_date"))
+@Table(name = "schedules", indexes = @Index(name = "idx_schedules_project_date", columnList = "project_id, start_date"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Schedule {
@@ -28,6 +28,9 @@ public class Schedule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -64,8 +67,9 @@ public class Schedule {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Schedule(String title, String content, ScheduleCategory category, LocalDate startDate, LocalDate endDate,
-                    LocalTime startTime, LocalTime endTime, String color, Long createdBy) {
+    public Schedule(Long projectId, String title, String content, ScheduleCategory category, LocalDate startDate,
+                    LocalDate endDate, LocalTime startTime, LocalTime endTime, String color, Long createdBy) {
+        this.projectId = projectId;
         this.createdBy = createdBy;
         update(title, content, category, startDate, endDate, startTime, endTime, color);
     }
@@ -83,9 +87,8 @@ public class Schedule {
     }
 
     /**
-     * 작성자 본인이거나 관리자(OWNER/ADMIN)면 수정/삭제 가능. isAdmin은 users.role(전역, 항상
-     * MEMBER로 고정됨)이 아니라 ProjectAccessService.isAdminInAnyProject(user) 결과를 서비스
-     * 레이어에서 미리 계산해서 넘겨준다.
+     * 작성자 본인이거나 이 프로젝트의 관리자(OWNER/ADMIN)면 수정/삭제 가능. isAdmin은 서비스 레이어에서
+     * 이 일정이 속한 프로젝트의 ProjectMember.role로 미리 계산해서 넘겨준다.
      */
     public boolean isEditableBy(User user, boolean isAdmin) {
         return createdBy.equals(user.getId()) || isAdmin;

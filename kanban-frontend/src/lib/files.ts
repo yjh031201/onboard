@@ -1,4 +1,4 @@
-// 파일 페이지(프로젝트 파일 업로드/목록/다운로드/삭제) 관련 API.
+// 파일 페이지(프로젝트 파일 업로드/목록/다운로드/삭제) 관련 API — 파일은 프로젝트마다 따로 저장된다.
 
 import { apiBlob, apiRequest } from "./api";
 
@@ -15,19 +15,19 @@ export interface ProjectFile {
   createdAt: string;
 }
 
-export function listFiles(): Promise<ProjectFile[]> {
-  return apiRequest<ProjectFile[]>("/api/files");
+export function listFiles(projectId: number): Promise<ProjectFile[]> {
+  return apiRequest<ProjectFile[]>(`/api/projects/${projectId}/files`);
 }
 
-export function uploadFile(file: File): Promise<ProjectFile> {
+export function uploadFile(projectId: number, file: File): Promise<ProjectFile> {
   const form = new FormData();
   form.append("file", file);
-  return apiRequest<ProjectFile>("/api/files", { method: "POST", body: form });
+  return apiRequest<ProjectFile>(`/api/projects/${projectId}/files`, { method: "POST", body: form });
 }
 
 /** 인증 헤더가 필요해서 <a href>로는 못 받음 — Blob으로 받아 임시 링크로 저장시킨다. */
-export async function downloadFile(file: ProjectFile): Promise<void> {
-  const blob = await apiBlob(`/api/files/${file.id}/download`);
+export async function downloadFile(projectId: number, file: ProjectFile): Promise<void> {
+  const blob = await apiBlob(`/api/projects/${projectId}/files/${file.id}/download`);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -37,6 +37,6 @@ export async function downloadFile(file: ProjectFile): Promise<void> {
 }
 
 /** 업로더 본인 또는 OWNER/ADMIN만 성공함 (서버에서 검증). */
-export function deleteFile(id: number): Promise<void> {
-  return apiRequest<void>(`/api/files/${id}`, { method: "DELETE" });
+export function deleteFile(projectId: number, id: number): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/files/${id}`, { method: "DELETE" });
 }

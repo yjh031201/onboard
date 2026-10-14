@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/schedules")
+@RequestMapping("/api/projects/{projectId}/schedules")
 public class ScheduleController {
 
     private final ScheduleService service;
@@ -29,35 +29,43 @@ public class ScheduleController {
         this.service = service;
     }
 
-    /** 캘린더 월별 조회 — 예: /api/schedules?year=2026&month=9 */
+    /** 캘린더 월별 조회 — 예: /api/projects/1/schedules?year=2026&month=9 */
     @GetMapping
     public ResponseEntity<List<ScheduleResponse>> getMonth(
+            @PathVariable Long projectId,
             @RequestParam int year,
-            @RequestParam int month
+            @RequestParam int month,
+            @AuthenticationPrincipal User currentUser
     ) {
-        return ResponseEntity.ok(service.getMonth(year, month));
+        return ResponseEntity.ok(service.getMonth(projectId, year, month, currentUser));
     }
 
     @PostMapping
     public ResponseEntity<ScheduleResponse> create(
+            @PathVariable Long projectId,
             @Valid @RequestBody ScheduleCreateRequest request,
             @AuthenticationPrincipal User currentUser
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request, currentUser));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(projectId, request, currentUser));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ScheduleResponse> update(
+            @PathVariable Long projectId,
             @PathVariable Long id,
             @Valid @RequestBody ScheduleUpdateRequest request,
             @AuthenticationPrincipal User currentUser
     ) {
-        return ResponseEntity.ok(service.update(id, request, currentUser));
+        return ResponseEntity.ok(service.update(projectId, id, request, currentUser));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
-        service.delete(id, currentUser);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        service.delete(projectId, id, currentUser);
         return ResponseEntity.noContent().build();
     }
 }

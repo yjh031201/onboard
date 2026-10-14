@@ -47,7 +47,7 @@ public class TimelineService {
         TimelineEventResponse response = TimelineEventResponse.from(saved);
         realtimeEventPublisher.publish(RealtimeChannels.timelineEvents(projectId), response);
         if (notified) {
-            slackIntegrationService.notifyIfConnected(message);
+            slackIntegrationService.notifyIfConnected(projectId, message);
         }
         return response;
     }

@@ -15,6 +15,7 @@ import {
 } from "../../lib/integrations";
 
 interface IntegrationManagePopupProps {
+  projectId: number;
   status: IntegrationStatus;
   canManage: boolean;
   onClose: () => void;
@@ -27,7 +28,13 @@ const PROVIDER_TITLE: Record<IntegrationStatus["provider"], string> = {
   GOOGLE_DRIVE: "Google Drive 연동 관리",
 };
 
-export default function IntegrationManagePopup({ status, canManage, onClose, onDisconnected }: IntegrationManagePopupProps) {
+export default function IntegrationManagePopup({
+  projectId,
+  status,
+  canManage,
+  onClose,
+  onDisconnected,
+}: IntegrationManagePopupProps) {
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -35,7 +42,7 @@ export default function IntegrationManagePopup({ status, canManage, onClose, onD
     setError(null);
     setDisconnecting(true);
     try {
-      await disconnectIntegration(status.provider);
+      await disconnectIntegration(projectId, status.provider);
       onDisconnected();
       onClose();
     } catch (err) {
@@ -68,9 +75,9 @@ export default function IntegrationManagePopup({ status, canManage, onClose, onD
 
         <Divider />
 
-        {status.provider === "GITHUB" && <GithubPanel status={status} canManage={canManage} />}
-        {status.provider === "SLACK" && <SlackPanel canManage={canManage} />}
-        {status.provider === "GOOGLE_DRIVE" && <DrivePanel />}
+        {status.provider === "GITHUB" && <GithubPanel projectId={projectId} status={status} canManage={canManage} />}
+        {status.provider === "SLACK" && <SlackPanel projectId={projectId} canManage={canManage} />}
+        {status.provider === "GOOGLE_DRIVE" && <DrivePanel projectId={projectId} />}
 
         {canManage && (
           <>
@@ -94,7 +101,15 @@ export default function IntegrationManagePopup({ status, canManage, onClose, onD
   );
 }
 
-function GithubPanel({ status, canManage }: { status: IntegrationStatus; canManage: boolean }) {
+function GithubPanel({
+  projectId,
+  status,
+  canManage,
+}: {
+  projectId: number;
+  status: IntegrationStatus;
+  canManage: boolean;
+}) {
   const [owner, setOwner] = useState(status.detail?.split("/")[0] ?? "");
   const [repo, setRepo] = useState(status.detail?.split("/")[1] ?? "");
   const [saving, setSaving] = useState(false);
@@ -107,7 +122,7 @@ function GithubPanel({ status, canManage }: { status: IntegrationStatus; canMana
   const loadIssues = () => {
     setLoadingIssues(true);
     setIssuesError(null);
-    fetchGithubIssues()
+    fetchGithubIssues(projectId)
       .then(setIssues)
       .catch((err) => setIssuesError(err instanceof ApiError ? err.message : "이슈를 불러오지 못했어요."))
       .finally(() => setLoadingIssues(false));
@@ -121,7 +136,7 @@ function GithubPanel({ status, canManage }: { status: IntegrationStatus; canMana
     setSaveError(null);
     setSaving(true);
     try {
-      await setGithubRepo(owner.trim(), repo.trim());
+      await setGithubRepo(projectId, owner.trim(), repo.trim());
       loadIssues();
     } catch (err) {
       setSaveError(err instanceof ApiError ? err.message : "저장소 연결에 실패했어요.");
@@ -179,7 +194,7 @@ function GithubPanel({ status, canManage }: { status: IntegrationStatus; canMana
   );
 }
 
-function SlackPanel({ canManage }: { canManage: boolean }) {
+function SlackPanel({ projectId, canManage }: { projectId: number; canManage: boolean }) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -187,7 +202,7 @@ function SlackPanel({ canManage }: { canManage: boolean }) {
     setSending(true);
     setResult(null);
     try {
-      await sendSlackTestMessage();
+      await sendSlackTestMessage(projectId);
       setResult({ type: "success", text: "테스트 메시지를 보냈어요. 슬랙 채널을 확인해보세요." });
     } catch (err) {
       setResult({ type: "error", text: err instanceof ApiError ? err.message : "메시지 전송에 실패했어요." });
@@ -215,17 +230,17 @@ function SlackPanel({ canManage }: { canManage: boolean }) {
   );
 }
 
-function DrivePanel() {
+function DrivePanel({ projectId }: { projectId: number }) {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDriveFiles()
+    fetchDriveFiles(projectId)
       .then(setFiles)
       .catch((err) => setError(err instanceof ApiError ? err.message : "파일 목록을 불러오지 못했어요."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [projectId]);
 
   return (
     <div className="flex w-full flex-col gap-2.5">

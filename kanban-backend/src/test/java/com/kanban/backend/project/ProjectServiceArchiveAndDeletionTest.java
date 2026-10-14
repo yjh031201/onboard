@@ -12,8 +12,11 @@ import static org.mockito.Mockito.when;
 import com.kanban.backend.board.BoardColumnRepository;
 import com.kanban.backend.board.CardRepository;
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.file.ProjectFileService;
+import com.kanban.backend.integration.IntegrationRepository;
 import com.kanban.backend.label.LabelRepository;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
+import com.kanban.backend.schedule.ScheduleRepository;
 import com.kanban.backend.timeline.TimelineEventRepository;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRole;
@@ -53,6 +56,9 @@ class ProjectServiceArchiveAndDeletionTest {
                 labelRepository,
                 cardRepository,
                 timelineEventRepository,
+                mock(IntegrationRepository.class),
+                mock(ScheduleRepository.class),
+                mock(ProjectFileService.class),
                 mock(RealtimeEventPublisher.class)
         );
     }

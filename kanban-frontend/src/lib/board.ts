@@ -2,7 +2,7 @@
 
 import { ApiError, apiRequest } from "./api";
 import { getStoredUser } from "./auth";
-import type { CardStatus, TaskCard } from "../types/dashboard";
+import type { AttachmentKind, CardAttachment, CardStatus, TaskCard } from "../types/dashboard";
 
 /** 카드 하나에 붙일 수 있는 라벨 수 (서버 Card.MAX_LABELS와 같음). */
 export const MAX_CARD_LABELS = 2;
@@ -37,6 +37,7 @@ interface CardDto {
   createdById: number;
   createdByName: string;
   createdAt: string;
+  attachments?: CardAttachment[];
 }
 
 export interface BoardEvent {
@@ -57,6 +58,7 @@ function toTaskCard(dto: CardDto): TaskCard {
     createdById: dto.createdById,
     createdByName: dto.createdByName,
     createdAt: dto.createdAt,
+    attachments: dto.attachments ?? [],
   };
 }
 
@@ -126,14 +128,49 @@ export function changeCardLabels(
   }).then(toTaskCard);
 }
 
+/**
+ * 카드에 GitHub 이슈(ref = 이슈 번호) 또는 Drive 파일(ref = 파일 id)을 붙인다.
+ * 제목·주소는 서버가 GitHub/Drive에서 직접 받아 저장한다. 화면 반영은 board 스냅샷으로.
+ */
+export function attachToCard(projectId: number, cardId: string, kind: AttachmentKind, ref: string): Promise<TaskCard> {
+  return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}/attachments`, {
+    method: "POST",
+    body: JSON.stringify({ kind, ref }),
+  }).then(toTaskCard);
+}
+
+export function detachFromCard(projectId: number, cardId: string, attachmentId: number): Promise<TaskCard> {
+  return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}/attachments/${attachmentId}`, {
+    method: "DELETE",
+  }).then(toTaskCard);
+}
+
+/** 연결된 저장소의 이슈들을 status 컬럼에 카드로 만든다. 이미 가져온 이슈는 서버가 건너뛴다. */
+export function importGithubIssues(projectId: number, status: CardStatus, issueNumbers: number[]): Promise<TaskCard[]> {
+  return apiRequest<CardDto[]>(`/api/projects/${projectId}/cards/import/github-issues`, {
+    method: "POST",
+    body: JSON.stringify({ status, issueNumbers }),
+  }).then(toTaskCards);
+}
+
+/**
+ * 이 첨부를 뗄 수 있는지 — 붙인 본인이거나 카드를 관리할 수 있는 사람 (서버에서도 검사).
+ * isAdmin은 이 프로젝트에서의 내 role이 OWNER/ADMIN인지 (useMyProjectRole).
+ */
+export function canDetach(task: TaskCard, attachment: CardAttachment, isAdmin: boolean): boolean {
+  return attachment.attachedById === getStoredUser()?.id || canManageCard(task, isAdmin);
+}
+
 export function deleteCard(projectId: number, cardId: string): Promise<void> {
   return apiRequest<void>(`/api/projects/${projectId}/cards/${cardId}`, { method: "DELETE" });
 }
 
-/** 작성자 본인이거나 OWNER/ADMIN만 수정·삭제 가능 (서버에서도 동일하게 검증됨). */
-export function canManageCard(task: TaskCard): boolean {
-  const user = getStoredUser();
-  return task.createdById === user?.id || user?.role === "OWNER" || user?.role === "ADMIN";
+/**
+ * 작성자 본인이거나 이 프로젝트의 OWNER/ADMIN만 수정·삭제 가능 (서버에서도 동일하게 검증됨).
+ * isAdmin은 useMyProjectRole로 구한 이 프로젝트에서의 내 role — 전역 user.role은 항상 MEMBER라 쓰면 안 된다.
+ */
+export function canManageCard(task: TaskCard, isAdmin: boolean): boolean {
+  return task.createdById === getStoredUser()?.id || isAdmin;
 }
 
 /** 라벨 선택 토글 — 이미 있으면 빼고, 없으면 최대 개수 안에서 뒤에 붙인다. */

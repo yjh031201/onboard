@@ -16,6 +16,7 @@ import type { ColumnDef } from "../../lib/boardColumns";
 import { EMPTY_CARD_FILTER, isFilterActive, matchesFilter } from "../../lib/cardFilter";
 import { findCardLabels } from "../../lib/labels";
 import { useLabels } from "../../hooks/useLabels";
+import { isProjectAdmin, useMyProjectRole } from "../../hooks/useMyProjectRole";
 import type { CardStatus, TaskCard } from "../../types/dashboard";
 import CardFilterBar from "../kanban/CardFilterBar";
 import { CardDescription, CardEditForm, ColumnPicker, LabelPicker, NewCardForm } from "../kanban/CardForms";
@@ -29,6 +30,7 @@ interface KanbanBoardProps {
 
 export default function KanbanBoard({ projectId, columns, tasks, loading }: KanbanBoardProps) {
   const labels = useLabels(projectId);
+  const isAdmin = isProjectAdmin(useMyProjectRole(projectId));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<CardStatus | null>(null);
   const [labelEditingId, setLabelEditingId] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                   }
 
                   const cardLabels = findCardLabels(labels, task);
-                  const canManage = canManageCard(task);
+                  const canManage = canManageCard(task, isAdmin);
                   const due = task.dueAt ? describeDue(task.dueAt) : null;
                   return (
                     <div

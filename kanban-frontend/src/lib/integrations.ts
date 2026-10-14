@@ -1,4 +1,4 @@
-// GitHub/Slack/Google Drive "연동" REST API.
+// GitHub/Slack/Google Drive "연동" REST API — 프로젝트마다 따로 연결한다.
 
 import { apiRequest } from "./api";
 
@@ -29,40 +29,45 @@ export interface DriveFile {
   modifiedTime: string;
 }
 
-export function fetchIntegrations(): Promise<IntegrationStatus[]> {
-  return apiRequest<IntegrationStatus[]>("/api/integrations");
+/** 이 프로젝트에 연결된 연동 상태 — 연동은 프로젝트마다 따로 저장된다. */
+export function fetchIntegrations(projectId: number): Promise<IntegrationStatus[]> {
+  return apiRequest<IntegrationStatus[]>(`/api/projects/${projectId}/integrations`);
 }
 
-export function disconnectIntegration(provider: IntegrationProvider): Promise<void> {
-  return apiRequest<void>(`/api/integrations/${provider}`, { method: "DELETE" });
+export function disconnectIntegration(projectId: number, provider: IntegrationProvider): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/integrations/${provider}`, { method: "DELETE" });
 }
 
-function connectUrlPath(provider: IntegrationProvider): string {
-  const slug = provider === "GOOGLE_DRIVE" ? "drive" : provider.toLowerCase();
-  return `/api/integrations/${slug}/connect`;
+function providerSlug(provider: IntegrationProvider): string {
+  return provider === "GOOGLE_DRIVE" ? "drive" : provider.toLowerCase();
 }
 
-/** 연결하기 버튼 핸들러에서 호출 — authorizeUrl을 받아서 전체 페이지 이동으로 OAuth 동의 화면에 보낸다. */
-export async function startConnect(provider: IntegrationProvider): Promise<void> {
-  const { authorizeUrl } = await apiRequest<{ authorizeUrl: string }>(connectUrlPath(provider));
+/**
+ * 연결하기 버튼 핸들러에서 호출 — authorizeUrl을 받아서 전체 페이지 이동으로 OAuth 동의 화면에 보낸다.
+ * 동의가 끝나면 서버가 이 프로젝트의 멤버 페이지(/projects/{id}/members)로 돌려보낸다.
+ */
+export async function startConnect(projectId: number, provider: IntegrationProvider): Promise<void> {
+  const { authorizeUrl } = await apiRequest<{ authorizeUrl: string }>(
+    `/api/projects/${projectId}/integrations/${providerSlug(provider)}/connect`,
+  );
   window.location.href = authorizeUrl;
 }
 
-export function setGithubRepo(owner: string, repo: string): Promise<void> {
-  return apiRequest<void>("/api/integrations/github/repo", {
+export function setGithubRepo(projectId: number, owner: string, repo: string): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/integrations/github/repo`, {
     method: "PUT",
     body: JSON.stringify({ owner, repo }),
   });
 }
 
-export function fetchGithubIssues(): Promise<GithubIssue[]> {
-  return apiRequest<GithubIssue[]>("/api/integrations/github/issues");
+export function fetchGithubIssues(projectId: number): Promise<GithubIssue[]> {
+  return apiRequest<GithubIssue[]>(`/api/projects/${projectId}/integrations/github/issues`);
 }
 
-export function sendSlackTestMessage(): Promise<void> {
-  return apiRequest<void>("/api/integrations/slack/test", { method: "POST" });
+export function sendSlackTestMessage(projectId: number): Promise<void> {
+  return apiRequest<void>(`/api/projects/${projectId}/integrations/slack/test`, { method: "POST" });
 }
 
-export function fetchDriveFiles(): Promise<DriveFile[]> {
-  return apiRequest<DriveFile[]>("/api/integrations/drive/files");
+export function fetchDriveFiles(projectId: number): Promise<DriveFile[]> {
+  return apiRequest<DriveFile[]>(`/api/projects/${projectId}/integrations/drive/files`);
 }

@@ -3,11 +3,13 @@ package com.kanban.backend.integration.github;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kanban.backend.common.ApiException;
+import com.kanban.backend.integration.ConnectState;
 import com.kanban.backend.integration.Integration;
 import com.kanban.backend.integration.IntegrationProvider;
 import com.kanban.backend.integration.IntegrationRepository;
 import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.IntegrationStateStore;
+import com.kanban.backend.integration.github.dto.GithubIssueDetail;
 import com.kanban.backend.integration.github.dto.GithubIssueResponse;
 import com.kanban.backend.user.User;
 import java.net.URLEncoder;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 public class GithubIntegrationService {
@@ -30,6 +33,7 @@ public class GithubIntegrationService {
     private static final String AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
     private static final String TOKEN_URL = "https://github.com/login/oauth/access_token";
     private static final String API_BASE = "https://api.github.com";
+    private static final String NOT_CONNECTED = "이 프로젝트에 GitHub이 연결되어 있지 않습니다.";
 
     private final IntegrationRepository integrationRepository;
     private final IntegrationStateStore stateStore;
@@ -57,8 +61,8 @@ public class GithubIntegrationService {
         this.clientSecret = clientSecret;
     }
 
-    public String buildAuthorizeUrl(Long userId, String redirectUri) {
-        String state = stateStore.issue(userId);
+    public String buildAuthorizeUrl(Long userId, Long projectId, String redirectUri) {
+        String state = stateStore.issue(userId, projectId);
         return AUTHORIZE_URL
                 + "?client_id=" + encode(clientId)
                 + "&redirect_uri=" + encode(redirectUri)
@@ -67,41 +71,131 @@ public class GithubIntegrationService {
     }
 
     @Transactional
-    public void handleCallback(String code, String state, String redirectUri) {
-        Long userId = stateStore.redeem(state);
+    public void handleCallback(String code, ConnectState state, String redirectUri) {
+        integrationService.requireAdminForCallback(state);
 
         String accessToken = exchangeCodeForToken(code, redirectUri);
         String login = fetchLogin(accessToken);
 
-        Integration integration = integrationRepository.findByProvider(IntegrationProvider.GITHUB)
-                .orElseGet(() -> new Integration(IntegrationProvider.GITHUB, accessToken, login, userId));
-        integration.updateTokens(accessToken, null, null);
+        Integration integration = integrationRepository
+                .findByProjectIdAndProvider(state.projectId(), IntegrationProvider.GITHUB)
+                .orElseGet(() -> new Integration(state.projectId(), IntegrationProvider.GITHUB, accessToken, login, state.userId()));
+        boolean accountChanged = integration.reconnect(accessToken, login, state.userId());
+        if (accountChanged) {
+            // 다른 GitHub 계정으로 바뀌면 이전 계정이 고른 저장소는 새 토큰으로 못 볼 수 있어서 비운다.
+            integration.clearGithubRepo();
+        }
         integrationRepository.save(integration);
     }
 
     @Transactional
-    public void linkRepo(String owner, String repo, User currentUser) {
-        integrationService.requireAdmin(currentUser);
-        Integration integration = requireConnected();
+    public void linkRepo(Long projectId, String owner, String repo, User currentUser) {
+        integrationService.requireAdmin(projectId, currentUser);
+        Integration integration = integrationService.requireConnected(projectId, IntegrationProvider.GITHUB, NOT_CONNECTED);
+        // 오타로 없는 저장소를 저장해 두면 이슈 조회 때마다 실패하므로, 저장 전에 접근 가능한지 확인한다.
+        githubGet("/repos/{owner}/{repo}", integration.getAccessToken(), owner, repo);
         integration.linkGithubRepo(owner, repo);
     }
 
     @Transactional(readOnly = true)
-    public List<GithubIssueResponse> listIssues() {
-        Integration integration = requireConnected();
+    public List<GithubIssueResponse> listIssues(Long projectId, User currentUser) {
+        integrationService.requireMember(projectId, currentUser);
+        Integration integration = integrationService.requireConnected(projectId, IntegrationProvider.GITHUB, NOT_CONNECTED);
         if (integration.getGithubOwner() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "먼저 연결할 저장소를 설정해주세요.");
         }
 
-        String body = restClient.get()
-                .uri(API_BASE + "/repos/{owner}/{repo}/issues?state=open&per_page=20",
-                        integration.getGithubOwner(), integration.getGithubRepo())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + integration.getAccessToken())
-                .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                .retrieve()
-                .body(String.class);
-
+        String body = githubGet("/repos/{owner}/{repo}/issues?state=open&per_page=20",
+                integration.getAccessToken(), integration.getGithubOwner(), integration.getGithubRepo());
         return parseIssues(body);
+    }
+
+    /** 이 프로젝트에 연결된 저장소 "owner/repo" — 이슈를 카드로 가져오거나 첨부할 때 이슈의 고유 id 앞부분으로 쓴다. */
+    @Transactional(readOnly = true)
+    public String linkedRepoFullName(Long projectId) {
+        Integration integration = requireLinkedRepo(projectId);
+        return integration.getGithubOwner() + "/" + integration.getGithubRepo();
+    }
+
+    /**
+     * 이 프로젝트에 연결된 저장소의 이슈 하나 — 제목·본문·주소를 GitHub에서 직접 받는다. PR이면 거절한다.
+     * 권한 체크(프로젝트 멤버)는 호출하는 쪽(CardAttachmentService)이 한다.
+     */
+    @Transactional(readOnly = true)
+    public GithubIssueDetail getIssue(Long projectId, long number) {
+        Integration integration = requireLinkedRepo(projectId);
+
+        String body;
+        try {
+            body = restClient.get()
+                    .uri(API_BASE + "/repos/{owner}/{repo}/issues/{number}",
+                            integration.getGithubOwner(), integration.getGithubRepo(), number)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + integration.getAccessToken())
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException e) {
+            int status = e.getStatusCode().value();
+            if (status == 404 || status == 410) {
+                throw new ApiException(HttpStatus.NOT_FOUND, "GitHub 이슈 #%d을(를) 찾을 수 없어요.".formatted(number));
+            }
+            if (status == 401) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "GitHub 연동이 만료됐어요. 연동을 해제하고 다시 연결해주세요.");
+            }
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 이슈를 불러오지 못했어요.");
+        }
+
+        try {
+            JsonNode node = objectMapper.readTree(body);
+            if (node.has("pull_request")) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "#%d은(는) 이슈가 아니라 PR이에요.".formatted(number));
+            }
+            return new GithubIssueDetail(
+                    node.path("number").asLong(),
+                    node.path("title").asText(""),
+                    node.path("body").asText(""),
+                    node.path("html_url").asText("")
+            );
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub 이슈를 불러오지 못했어요.");
+        }
+    }
+
+    private Integration requireLinkedRepo(Long projectId) {
+        Integration integration = integrationService.requireConnected(projectId, IntegrationProvider.GITHUB, NOT_CONNECTED);
+        if (integration.getGithubOwner() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "먼저 연결할 저장소를 설정해주세요.");
+        }
+        return integration;
+    }
+
+    /** GitHub API GET — 실패 원인을 사용자에게 보여줄 수 있는 메시지로 바꾼다 (그냥 두면 500으로 나간다). */
+    private String githubGet(String path, String accessToken, Object... uriVariables) {
+        try {
+            return restClient.get()
+                    .uri(API_BASE + path, uriVariables)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException e) {
+            int status = e.getStatusCode().value();
+            if (status == 404) {
+                // 비공개 저장소에 권한이 없을 때도 GitHub은 404를 준다.
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "저장소를 찾을 수 없어요. 소유자·저장소 이름과, 연결한 GitHub 계정이 접근할 수 있는 저장소인지 확인해주세요.");
+            }
+            if (status == 401) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "GitHub 연동이 만료됐어요. 연동을 해제하고 다시 연결해주세요.");
+            }
+            if (status == 403) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "GitHub이 접근을 거부했어요. 조직 저장소라면 조직 설정에서 이 앱의 접근을 허용해야 해요.");
+            }
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GitHub에서 정보를 불러오지 못했어요.");
+        }
     }
 
     private List<GithubIssueResponse> parseIssues(String body) {
@@ -156,22 +250,12 @@ public class GithubIntegrationService {
     }
 
     private String fetchLogin(String accessToken) {
-        String body = restClient.get()
-                .uri(API_BASE + "/user")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                .retrieve()
-                .body(String.class);
         try {
+            String body = githubGet("/user", accessToken);
             return objectMapper.readTree(body).path("login").asText("GitHub");
         } catch (Exception e) {
             return "GitHub";
         }
-    }
-
-    private Integration requireConnected() {
-        return integrationRepository.findByProvider(IntegrationProvider.GITHUB)
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "GitHub이 연결되어 있지 않습니다."));
     }
 
     private static String encode(String value) {
