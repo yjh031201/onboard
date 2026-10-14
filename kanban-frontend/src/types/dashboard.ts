@@ -68,7 +68,7 @@ export interface KanbanColumn {
 
 export interface TimelineEventDto {
   id: number;
-  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED";
+  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED" | "CARD_COMMENTED";
   message: string;
   actorId: number;
   actorName: string;

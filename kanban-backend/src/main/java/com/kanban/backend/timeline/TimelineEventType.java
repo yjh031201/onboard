@@ -4,5 +4,6 @@ public enum TimelineEventType {
     CARD_CREATED,
     CARD_MOVED,
     CARD_UPDATED,
-    CARD_LABEL_CHANGED
+    CARD_LABEL_CHANGED,
+    CARD_COMMENTED
 }

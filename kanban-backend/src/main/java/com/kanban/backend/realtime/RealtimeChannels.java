@@ -63,6 +63,15 @@ public final class RealtimeChannels {
         return "/topic/projects/" + projectId + "/columns";
     }
 
+    /** 카드 댓글이 바뀌면 — 열려 있는 카드 상세 창이 듣는다. */
+    public static String cardCommentEvents(Long projectId) {
+        return "realtime:projects:" + projectId + ":card-comments";
+    }
+
+    public static String cardCommentTopic(Long projectId) {
+        return "/topic/projects/" + projectId + "/card-comments";
+    }
+
     /** 프로젝트 이름/설명/보관 상태가 바뀌면 — 설정 페이지와 ArchivedBanner가 듣는다. */
     public static String settingsEvents(Long projectId) {
         return "realtime:projects:" + projectId + ":settings";
