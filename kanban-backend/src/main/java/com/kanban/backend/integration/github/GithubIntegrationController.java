@@ -5,6 +5,7 @@ import com.kanban.backend.integration.IntegrationService;
 import com.kanban.backend.integration.dto.ConnectUrlResponse;
 import com.kanban.backend.integration.github.dto.GithubIssueResponse;
 import com.kanban.backend.integration.github.dto.GithubRepoRequest;
+import com.kanban.backend.integration.github.dto.GithubRepoResponse;
 import com.kanban.backend.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -73,6 +74,16 @@ public class GithubIntegrationController {
     ) {
         githubIntegrationService.linkRepo(projectId, request.owner().trim(), request.repo().trim(), currentUser);
         return ResponseEntity.noContent().build();
+    }
+
+    /** 소유자(사용자 또는 조직)의 저장소 목록 — 저장소 입력칸에서 골라 넣을 수 있게. */
+    @GetMapping("/api/projects/{projectId}/integrations/github/repos")
+    public ResponseEntity<List<GithubRepoResponse>> repos(
+            @PathVariable Long projectId,
+            @RequestParam String owner,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(githubIntegrationService.listRepos(projectId, owner, currentUser));
     }
 
     @GetMapping("/api/projects/{projectId}/integrations/github/issues")

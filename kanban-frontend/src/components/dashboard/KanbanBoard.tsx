@@ -17,9 +17,11 @@ import { EMPTY_CARD_FILTER, isFilterActive, matchesFilter } from "../../lib/card
 import { findCardLabels } from "../../lib/labels";
 import { useLabels } from "../../hooks/useLabels";
 import { isProjectAdmin, useMyProjectRole } from "../../hooks/useMyProjectRole";
+import { useProjectMembers } from "../../hooks/useProjectMembers";
 import type { CardStatus, TaskCard } from "../../types/dashboard";
 import CardFilterBar from "../kanban/CardFilterBar";
-import { CardDescription, CardEditForm, ColumnPicker, LabelPicker, NewCardForm } from "../kanban/CardForms";
+import CardDetailModal from "../kanban/CardDetailModal";
+import { CardDescription, CardEditForm, LabelPicker, NewCardForm } from "../kanban/CardForms";
 
 interface KanbanBoardProps {
   projectId: number;
@@ -31,12 +33,15 @@ interface KanbanBoardProps {
 export default function KanbanBoard({ projectId, columns, tasks, loading }: KanbanBoardProps) {
   const labels = useLabels(projectId);
   const isAdmin = isProjectAdmin(useMyProjectRole(projectId));
+  const members = useProjectMembers(projectId);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<CardStatus | null>(null);
   const [labelEditingId, setLabelEditingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [movingId, setMovingId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [filter, setFilter] = useState(EMPTY_CARD_FILTER);
+  // 최신 스냅샷에서 찾는다 — 그 사이 삭제된 카드면 undefined라 창이 닫힌다.
+  const detailTask = detailId ? tasks.find((task) => task.id === detailId) : undefined;
 
   // 설정에서 지워진 라벨이 필터에 남아 있으면, 버튼은 사라졌는데 카드만 계속 걸러지므로 뺀다.
   const activeFilter = { ...filter, labelIds: filter.labelIds.filter((id) => labels.some((label) => label.id === id)) };
@@ -64,9 +69,10 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
     labelIds: string[],
     customLabel: string | null,
     dueAt: string | null,
+    assigneeId: number | null,
   ) => {
     setAddingTo(null);
-    createCard(projectId, title, status, labelIds, customLabel, dueAt).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
+    createCard(projectId, title, status, labelIds, customLabel, dueAt, assigneeId).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
   };
 
   const toggleLabelEditing = (task: TaskCard) => {
@@ -86,15 +92,14 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
     );
   };
 
-  // 카드를 누르면 그 카드 안에 "이동할 컬럼" 목록이 열린다 — 드래그하지 않고도 눌러서 옮길 수 있다.
-  const toggleMoving = (e: MouseEvent<HTMLDivElement>, task: TaskCard) => {
+  // 카드를 누르면 상세 창이 열린다 — 창 안에서 눌러서 다른 컬럼으로 옮길 수도 있다.
+  const openDetail = (e: MouseEvent<HTMLDivElement>, task: TaskCard) => {
     // 카드 안의 버튼(라벨·수정·삭제 등)을 누른 것은 카드를 고른 것으로 치지 않는다.
     if ((e.target as HTMLElement).closest("button")) return;
-    setMovingId(movingId === task.id ? null : task.id);
+    setDetailId(task.id);
   };
 
   const moveCardToColumn = (task: TaskCard, status: CardStatus) => {
-    setMovingId(null);
     // 옮겨 간 컬럼의 맨 아래에 붙인다. 화면 반영은 드래그와 마찬가지로 board 스냅샷으로 한다.
     const position = tasks.filter((other) => other.status === status).length;
     moveCard(projectId, task.id, status, position).catch((err) => alertCardError(err, "카드를 옮기지 못했어요."));
@@ -148,7 +153,7 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                 {columnTasks.map((task) => {
                   if (editingId === task.id) {
                     return (
-                      <CardEditForm key={task.id} projectId={projectId} task={task} onDone={() => setEditingId(null)} />
+                      <CardEditForm key={task.id} projectId={projectId} task={task} members={members} onDone={() => setEditingId(null)} />
                     );
                   }
 
@@ -161,7 +166,7 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                       draggable
                       onDragStart={() => setDraggingId(task.id)}
                       onDragEnd={() => setDraggingId(null)}
-                      onClick={(e) => toggleMoving(e, task)}
+                      onClick={(e) => openDetail(e, task)}
                       onDragOver={(e: DragEvent) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -170,11 +175,10 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                         e.stopPropagation();
                         handleDrop(column.id, task.id);
                       }}
-                      title={`${task.createdByName}님이 작성`}
                       // shrink-0: 컬럼이 꽉 차도 카드가 눌려 내용이 잘리지 않게 한다 (대신 목록이 스크롤된다).
                       className={`group flex min-h-[52px] w-full shrink-0 cursor-grab flex-col justify-center gap-1.5 rounded-lg border bg-white p-3 transition-opacity active:cursor-grabbing ${
                         draggingId === task.id ? "opacity-40" : ""
-                      } ${movingId === task.id ? "border-[#6366f1]" : "border-[#f0f0f2]"}`}
+                      } border-[#f0f0f2]`}
                     >
                       <div className="flex w-full flex-wrap items-start gap-x-2 gap-y-1.5">
                         <span
@@ -235,12 +239,12 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                       </div>
 
                       {task.description && (
-                        <CardDescription text={task.description} expanded={movingId === task.id} />
+                        <CardDescription text={task.description} expanded={false} />
                       )}
 
-                      {/* 작성자는 항상 왼쪽에, 마감은 있을 때만 오른쪽에 보여 준다. */}
+                      {/* 담당자는 왼쪽에, 마감은 오른쪽에 — 둘 다 있을 때만 보여 준다 (작성자는 카드에 보이지 않는다). */}
                       <div className="flex w-full items-center justify-between gap-2 pl-[18px]">
-                        <span className="min-w-0 truncate text-[11px] text-[#9ca3af]">{task.createdByName}</span>
+                        <span className="min-w-0 truncate text-[11px] text-[#9ca3af]">{task.assigneeName}</span>
                         {due && (
                           <span
                             className={`shrink-0 text-[11px] ${due.overdue ? "font-medium text-[#ef4444]" : "text-[#6b7280]"}`}
@@ -250,16 +254,6 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                           </span>
                         )}
                       </div>
-
-                      {movingId === task.id && (
-                        <div className="flex w-full items-start gap-2 border-t border-[#f0f0f2] pt-2">
-                          <ColumnPicker
-                            columns={columns}
-                            currentId={column.id}
-                            onPick={(columnId) => moveCardToColumn(task, columnId)}
-                          />
-                        </div>
-                      )}
 
                       {labelEditingId === task.id && (
                         <div className="flex w-full flex-col gap-1.5 border-t border-[#f0f0f2] pt-2">
@@ -291,8 +285,9 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
               {addingTo === column.id ? (
                 <NewCardForm
                   labels={labels}
-                  onSubmit={(title, labelIds, customLabel, dueAt) =>
-                    submitNewCard(column.id, title, labelIds, customLabel, dueAt)
+                  members={members}
+                  onSubmit={(title, labelIds, customLabel, dueAt, assigneeId) =>
+                    submitNewCard(column.id, title, labelIds, customLabel, dueAt, assigneeId)
                   }
                   onCancel={() => setAddingTo(null)}
                 />
@@ -310,6 +305,18 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
           );
         })}
       </div>
+      {detailTask && (
+        <CardDetailModal
+          projectId={projectId}
+          task={detailTask}
+          columns={columns}
+          labels={labels}
+          members={members}
+          isAdmin={isAdmin}
+          onMove={(status) => moveCardToColumn(detailTask, status)}
+          onClose={() => setDetailId(null)}
+        />
+      )}
     </div>
   );
 }

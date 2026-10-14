@@ -13,6 +13,7 @@ import InvitePopup from "../../components/members/InvitePopup";
 import RolePopup from "../../components/members/RolePopup";
 import { roleLabel } from "../../components/members/RoleCheckboxes";
 import IntegrationManagePopup from "../../components/members/IntegrationManagePopup";
+import SlackConnectPopup from "../../components/members/SlackConnectPopup";
 import { fetchIntegrations, startConnect, type IntegrationProvider, type IntegrationStatus } from "../../lib/integrations";
 
 const ROLE_PILL: Record<string, { bg: string; text: string }> = {
@@ -39,6 +40,7 @@ export default function MembersPage() {
 
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
   const [managingIntegration, setManagingIntegration] = useState<IntegrationStatus | null>(null);
+  const [slackConnectOpen, setSlackConnectOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [integrationBanner, setIntegrationBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -46,6 +48,18 @@ export default function MembersPage() {
     fetchIntegrations(projectId).then(setIntegrations).catch(() => {
       /* 연동 상태는 부가 정보라, 실패해도 나머지 페이지는 그대로 쓸 수 있게 조용히 둔다. */
     });
+  };
+
+  // 관리 창에서 설정을 바꾼 뒤(예: GitHub 저장소) — 목록과 열려 있는 관리 창의 상태를 같이 새로 받는다.
+  const reloadManagingIntegration = () => {
+    fetchIntegrations(projectId)
+      .then((list) => {
+        setIntegrations(list);
+        setManagingIntegration((prev) => (prev ? (list.find((i) => i.provider === prev.provider) ?? prev) : prev));
+      })
+      .catch(() => {
+        /* 다시 못 받아 와도 저장은 됐으니, 창을 다시 열면 맞춰진다. */
+      });
   };
 
   useEffect(() => {
@@ -61,6 +75,7 @@ export default function MembersPage() {
     // 다른 프로젝트로 옮겨 오면 앞 프로젝트의 연동 상태가 잠깐 보이지 않게 비우고 다시 불러온다.
     setIntegrations([]);
     setManagingIntegration(null);
+    setSlackConnectOpen(false);
     loadIntegrations();
   }, [projectId]);
 
@@ -85,6 +100,11 @@ export default function MembersPage() {
   }, []);
 
   const handleConnect = (provider: IntegrationProvider) => {
+    // Slack은 웹훅 주소만 붙여 넣어도 연결되므로, 바로 OAuth로 보내지 않고 연결 팝업을 띄운다.
+    if (provider === "SLACK") {
+      setSlackConnectOpen(true);
+      return;
+    }
     startConnect(projectId, provider).catch((err) => {
       setIntegrationBanner({
         type: "error",
@@ -221,6 +241,17 @@ export default function MembersPage() {
         />
       )}
 
+      {slackConnectOpen && (
+        <SlackConnectPopup
+          projectId={projectId}
+          onClose={() => setSlackConnectOpen(false)}
+          onConnected={() => {
+            setIntegrationBanner({ type: "success", text: "연동이 완료됐어요." });
+            loadIntegrations();
+          }}
+        />
+      )}
+
       {managingIntegration && (
         <IntegrationManagePopup
           projectId={projectId}
@@ -228,6 +259,7 @@ export default function MembersPage() {
           canManage={canManageMembers}
           onClose={() => setManagingIntegration(null)}
           onDisconnected={loadIntegrations}
+          onRepoSaved={reloadManagingIntegration}
         />
       )}
     </PageShell>

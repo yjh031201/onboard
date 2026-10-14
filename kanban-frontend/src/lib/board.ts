@@ -34,6 +34,8 @@ interface CardDto {
   labelIds: string[];
   customLabel: string | null;
   dueAt: string | null;
+  assigneeId: number | null;
+  assigneeName: string | null;
   createdById: number;
   createdByName: string;
   createdAt: string;
@@ -55,6 +57,8 @@ function toTaskCard(dto: CardDto): TaskCard {
     labelIds: dto.labelIds ?? [],
     customLabel: dto.customLabel ?? null,
     dueAt: dto.dueAt,
+    assigneeId: dto.assigneeId ?? null,
+    assigneeName: dto.assigneeName ?? null,
     createdById: dto.createdById,
     createdByName: dto.createdByName,
     createdAt: dto.createdAt,
@@ -70,7 +74,10 @@ export function fetchCards(projectId: number): Promise<TaskCard[]> {
   return apiRequest<CardDto[]>(`/api/projects/${projectId}/cards`).then(toTaskCards);
 }
 
-/** customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음). */
+/**
+ * customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음).
+ * assigneeId는 담당할 프로젝트 멤버의 userId, null이면 담당자 없음.
+ */
 export function createCard(
   projectId: number,
   title: string,
@@ -78,24 +85,26 @@ export function createCard(
   labelIds: string[],
   customLabel: string | null,
   dueAt: string | null,
+  assigneeId: number | null,
 ): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/projects/${projectId}/cards`, {
     method: "POST",
-    body: JSON.stringify({ title, status, labelIds, customLabel, dueAt }),
+    body: JSON.stringify({ title, status, labelIds, customLabel, dueAt, assigneeId }),
   }).then(toTaskCard);
 }
 
-/** 제목·설명·마감 수정. description이 비어 있으면 설명을, dueAt이 null이면 마감을 지운다. */
+/** 제목·설명·마감·담당자 수정. description이 비어 있으면 설명을, dueAt이 null이면 마감을, assigneeId가 null이면 담당자를 지운다. */
 export function updateCard(
   projectId: number,
   cardId: string,
   title: string,
   description: string,
   dueAt: string | null,
+  assigneeId: number | null,
 ): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/projects/${projectId}/cards/${cardId}`, {
     method: "PATCH",
-    body: JSON.stringify({ title, description, dueAt }),
+    body: JSON.stringify({ title, description, dueAt, assigneeId }),
   }).then(toTaskCard);
 }
 

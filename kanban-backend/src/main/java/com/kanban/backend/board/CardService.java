@@ -16,6 +16,7 @@ import com.kanban.backend.realtime.RealtimeEventPublisher;
 import com.kanban.backend.timeline.TimelineEventType;
 import com.kanban.backend.timeline.TimelineService;
 import com.kanban.backend.user.User;
+import com.kanban.backend.user.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class CardService {
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final ProjectAccessService projectAccessService;
     private final CardAttachmentRepository attachmentRepository;
+    private final UserRepository userRepository;
 
     public CardService(
             CardRepository cardRepository,
@@ -43,7 +45,8 @@ public class CardService {
             TimelineService timelineService,
             RealtimeEventPublisher realtimeEventPublisher,
             ProjectAccessService projectAccessService,
-            CardAttachmentRepository attachmentRepository
+            CardAttachmentRepository attachmentRepository,
+            UserRepository userRepository
     ) {
         this.cardRepository = cardRepository;
         this.columnRepository = columnRepository;
@@ -52,6 +55,7 @@ public class CardService {
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.projectAccessService = projectAccessService;
         this.attachmentRepository = attachmentRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -66,9 +70,11 @@ public class CardService {
         BoardColumn column = findColumn(projectId, request.status());
         List<String> labelIds = validLabelIds(projectId, request.labelIds());
         String customLabel = normalizeCustomLabel(projectId, labelIds, request.customLabel());
+        User assignee = findAssignee(projectId, request.assigneeId());
         int position = cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, column.getId()).size();
         Card card = cardRepository.save(new Card(
                 projectId, request.title().trim(), column.getId(), position, labelIds, customLabel, request.dueAt(),
+                assignee == null ? null : assignee.getId(), assignee == null ? null : assignee.getName(),
                 actor.getId(), actor.getName()
         ));
 
@@ -116,7 +122,7 @@ public class CardService {
         return toResponse(card);
     }
 
-    /** 제목·설명·마감 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
+    /** 제목·설명·마감·담당자 수정 — 삭제와 같은 권한(작성자 또는 관리자). */
     @Transactional
     public CardResponse update(Long projectId, Long cardId, UpdateCardRequest request, User actor) {
         projectAccessService.requireMember(projectId, actor);
@@ -125,6 +131,11 @@ public class CardService {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인이 만든 카드만 수정할 수 있습니다.");
         }
 
+        // 담당자가 그대로면 검사도 덮어쓰기도 하지 않는다 — 그 사이 프로젝트를 나간 담당자 카드도 다른 내용은 고칠 수 있게.
+        if (!Objects.equals(card.getAssigneeId(), request.assigneeId())) {
+            User assignee = findAssignee(projectId, request.assigneeId());
+            card.assign(assignee == null ? null : assignee.getId(), assignee == null ? null : assignee.getName());
+        }
         card.update(request.title().trim(), normalizeDescription(request.description()), request.dueAt());
         timelineService.record(
                 projectId,
@@ -206,7 +217,7 @@ public class CardService {
     public Card createImported(Long projectId, String columnId, String title, String description, User actor) {
         BoardColumn column = findColumn(projectId, columnId);
         int position = cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, column.getId()).size();
-        Card card = new Card(projectId, title, column.getId(), position, List.of(), null, null, actor.getId(), actor.getName());
+        Card card = new Card(projectId, title, column.getId(), position, List.of(), null, null, null, null, actor.getId(), actor.getName());
         card.update(title, normalizeDescription(description), null);
         return cardRepository.save(card);
     }
@@ -261,6 +272,18 @@ public class CardService {
             throw new ApiException(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다.");
         }
         return card;
+    }
+
+    /** null은 담당자 없음. 이 프로젝트의 (수락한) 멤버만 담당자가 될 수 있다. */
+    private User findAssignee(Long projectId, Long assigneeId) {
+        if (assigneeId == null) {
+            return null;
+        }
+        if (projectAccessService.myRoleOrNull(projectId, assigneeId) == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "프로젝트 멤버만 담당자로 지정할 수 있습니다.");
+        }
+        return userRepository.findById(assigneeId)
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "프로젝트 멤버만 담당자로 지정할 수 있습니다."));
     }
 
     /** 앞뒤 공백을 떼고, 내용이 없으면 설명 없음(null)으로 저장한다. */

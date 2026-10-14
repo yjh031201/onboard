@@ -9,4 +9,6 @@ public interface TimelineEventRepository extends JpaRepository<TimelineEvent, Lo
     List<TimelineEvent> findAllByProjectIdOrderByCreatedAtDesc(Long projectId, Pageable pageable);
 
     void deleteAllByProjectId(Long projectId);
+
+    List<TimelineEvent> findAllByActorId(Long actorId);
 }

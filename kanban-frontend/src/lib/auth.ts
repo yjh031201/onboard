@@ -23,6 +23,8 @@ export interface AuthUser {
   role: string;
   /** "게스트로 이용"으로 들어온 계정이면 true — 프로젝트를 새로 만들 수 없고 초대받아 참여만 가능. */
   isGuest: boolean;
+  /** 소셜 로그인 전용 계정이면 false — 이 필드가 생기기 전에 로그인한 세션에는 없을 수 있다. */
+  hasPassword?: boolean;
 }
 
 interface AuthResponse {

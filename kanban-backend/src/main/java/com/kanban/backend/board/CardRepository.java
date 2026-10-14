@@ -2,6 +2,7 @@ package com.kanban.backend.board;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,4 +18,14 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     @Query("select c from Card c where c.projectId = :projectId and :labelId member of c.labelIds")
     List<Card> findAllWithLabel(@Param("projectId") Long projectId, @Param("labelId") String labelId);
+
+    /** 회원 탈퇴 시 — 카드는 팀 작업물이라 남기고, 카드에 복사돼 있던 작성자 이름만 바꾼다. */
+    @Modifying
+    @Query("update Card c set c.createdByName = :name where c.createdById = :userId")
+    void renameCreator(@Param("userId") Long userId, @Param("name") String name);
+
+    /** 회원 탈퇴 시 — 담당자로 지정돼 있던 카드도 남기고, 담당자 이름만 바꾼다. */
+    @Modifying
+    @Query("update Card c set c.assigneeName = :name where c.assigneeId = :userId")
+    void renameAssignee(@Param("userId") Long userId, @Param("name") String name);
 }

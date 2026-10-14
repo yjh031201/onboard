@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Field } from "../ui/Field";
 import Button from "../ui/Button";
 import { Divider } from "../ui/Section";
 import { ApiError } from "../../lib/api";
-import { changePassword, updateProfile } from "../../lib/user";
+import { changePassword, deleteAccount, updateProfile } from "../../lib/user";
 import type { AuthUser } from "../../lib/auth";
 
 interface PersonalSettingsModalProps {
@@ -11,6 +12,9 @@ interface PersonalSettingsModalProps {
   onClose: () => void;
   onUpdated: (user: AuthUser) => void;
 }
+
+/** 비밀번호가 없는 소셜 로그인 계정이 탈퇴할 때 대신 입력하는 확인 문구. */
+const DELETE_CONFIRM_PHRASE = "탈퇴합니다";
 
 export default function PersonalSettingsModal({ user, onClose, onUpdated }: PersonalSettingsModalProps) {
   const [name, setName] = useState(user.name);
@@ -26,6 +30,14 @@ export default function PersonalSettingsModal({ user, onClose, onUpdated }: Pers
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
+  const navigate = useNavigate();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  // 소셜 로그인 전용 계정은 확인할 비밀번호가 없어서 확인 문구를 대신 입력받는다.
+  const confirmByPassword = user.hasPassword !== false;
 
   const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,6 +76,25 @@ export default function PersonalSettingsModal({ user, onClose, onUpdated }: Pers
       setPasswordError(err instanceof ApiError ? err.message : "비밀번호 변경에 실패했어요.");
     } finally {
       setPasswordSubmitting(false);
+    }
+  };
+
+  const handleDeleteAccount = async (e: FormEvent) => {
+    e.preventDefault();
+    setDeleteError(null);
+
+    if (!confirmByPassword && deleteConfirm.trim() !== DELETE_CONFIRM_PHRASE) {
+      setDeleteError(`확인을 위해 ${DELETE_CONFIRM_PHRASE}를 정확히 입력해주세요.`);
+      return;
+    }
+
+    setDeleteSubmitting(true);
+    try {
+      await deleteAccount(confirmByPassword ? deleteConfirm : undefined);
+      navigate("/login", { replace: true });
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "회원 탈퇴에 실패했어요.");
+      setDeleteSubmitting(false);
     }
   };
 
@@ -165,6 +196,57 @@ export default function PersonalSettingsModal({ user, onClose, onUpdated }: Pers
             <Button type="submit" variant="primary" disabled={passwordSubmitting} className="disabled:opacity-60">
               {passwordSubmitting ? "변경 중..." : "비밀번호 변경"}
             </Button>
+          </div>
+        </form>
+
+        <Divider />
+
+        <form onSubmit={handleDeleteAccount} className="flex w-full flex-col gap-[14px]">
+          <p className="text-[13px] font-bold text-[#111827]">회원 탈퇴</p>
+          <p className="text-[12.5px] leading-[1.6] text-[#6b7280]">
+            탈퇴하면 계정, 내가 올린 파일과 일정, 혼자 쓰던 프로젝트가 삭제되고 되돌릴 수 없어요. 팀 프로젝트에 남긴
+            카드와 활동 기록은 지워지지 않고 이름만 탈퇴한 사용자로 바뀌어요.
+          </p>
+
+          {deleteOpen && (
+            <Field
+              label={confirmByPassword ? "비밀번호 확인" : `확인 문구 (${DELETE_CONFIRM_PHRASE})`}
+              type={confirmByPassword ? "password" : "text"}
+              placeholder={confirmByPassword ? "••••••••" : DELETE_CONFIRM_PHRASE}
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              required
+            />
+          )}
+
+          {deleteError && (
+            <div className="w-full rounded-[10px] bg-[#fef2f2] px-4 py-3">
+              <p className="text-[13px] text-[#ef4444]">{deleteError}</p>
+            </div>
+          )}
+
+          <div className="flex w-full justify-end gap-2">
+            {deleteOpen ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setDeleteOpen(false);
+                    setDeleteConfirm("");
+                    setDeleteError(null);
+                  }}
+                >
+                  취소
+                </Button>
+                <Button type="submit" variant="danger" disabled={deleteSubmitting} className="disabled:opacity-60">
+                  {deleteSubmitting ? "탈퇴 처리 중..." : "탈퇴하기"}
+                </Button>
+              </>
+            ) : (
+              <Button variant="secondary" onClick={() => setDeleteOpen(true)} className="text-[#ef4444]">
+                회원 탈퇴
+              </Button>
+            )}
           </div>
         </form>
       </div>

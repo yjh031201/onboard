@@ -32,6 +32,9 @@ public class SlackIntegrationService {
     private static final String AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
     private static final String TOKEN_URL = "https://slack.com/api/oauth.v2.access";
     private static final String SCOPES = "incoming-webhook,chat:write";
+    private static final String WEBHOOK_URL_PREFIX = "https://hooks.slack.com/services/";
+    /** 웹훅 주소로 연결한 경우엔 OAuth 토큰이 없다 — access_token이 NOT NULL이라 넣어 두는 자리 표시 값. */
+    private static final String WEBHOOK_ONLY_TOKEN = "webhook";
 
     private final IntegrationRepository integrationRepository;
     private final IntegrationStateStore stateStore;
@@ -60,6 +63,10 @@ public class SlackIntegrationService {
     }
 
     public String buildAuthorizeUrl(Long userId, Long projectId, String redirectUri) {
+        if (clientId.startsWith("dummy-")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "서버에 Slack 앱 키가 설정되어 있지 않아요. 웹훅 주소로 연결해주세요.");
+        }
         String state = stateStore.issue(userId, projectId);
         return AUTHORIZE_URL
                 + "?client_id=" + encode(clientId)
@@ -110,6 +117,34 @@ public class SlackIntegrationService {
                 .orElseGet(() -> new Integration(state.projectId(), IntegrationProvider.SLACK, accessToken, teamName, state.userId()));
         integration.reconnect(accessToken, teamName, state.userId());
         integration.setSlackWebhook(webhookUrl, channel);
+        integrationRepository.save(integration);
+    }
+
+    /**
+     * OAuth 없이 Slack Incoming Webhook 주소를 직접 받아 이 프로젝트에 연결한다 — Slack 앱 키(client id/secret)나
+     * HTTPS 콜백 주소가 없는 환경(로컬 개발 등)에서도 쓸 수 있다. 저장 전에 실제로 메시지를 보내 주소를 검증한다.
+     * 권한 체크(프로젝트 관리자)는 컨트롤러가 한다.
+     */
+    @Transactional
+    public void connectWithWebhook(Long projectId, Long userId, String rawWebhookUrl) {
+        String webhookUrl = rawWebhookUrl.trim();
+        // 서버가 임의의 주소로 요청을 보내지 않도록 Slack 웹훅 주소만 받는다.
+        if (!webhookUrl.startsWith(WEBHOOK_URL_PREFIX)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Slack 웹훅 주소는 " + WEBHOOK_URL_PREFIX + " 로 시작해야 해요.");
+        }
+
+        try {
+            postToWebhook(webhookUrl, "✅ 칸반보드와 Slack이 연결됐어요.");
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "이 웹훅 주소로 메시지를 보내지 못했어요. 주소를 다시 확인해주세요.");
+        }
+
+        Integration integration = integrationRepository
+                .findByProjectIdAndProvider(projectId, IntegrationProvider.SLACK)
+                .orElseGet(() -> new Integration(projectId, IntegrationProvider.SLACK, WEBHOOK_ONLY_TOKEN, "Slack 웹훅", userId));
+        integration.reconnect(WEBHOOK_ONLY_TOKEN, "Slack 웹훅", userId);
+        integration.setSlackWebhook(webhookUrl, null);
         integrationRepository.save(integration);
     }
 

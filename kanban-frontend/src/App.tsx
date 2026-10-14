@@ -10,6 +10,7 @@ import OAuthCallbackPage from "./pages/auth/OAuthCallbackPage";
 import KanbanPage from "./pages/kanban/KanbanPage";
 import TimelinePage from "./pages/timeline/TimelinePage";
 import MembersPage from "./pages/members/MembersPage";
+import IntegrationReturnPage from "./pages/members/IntegrationReturnPage";
 import FilesPage from "./pages/files/FilesPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import PrivacyPage from "./pages/PrivacyPage";
@@ -26,6 +27,9 @@ function App() {
       <Route path="/privacy" element={<PrivacyPage />} />
 
       <Route path="/" element={<HomePage />} />
+
+      {/* GitHub/Slack/Drive 연동 콜백이 돌아오는 주소 — 연동을 시작한 프로젝트의 팀원 페이지로 넘겨준다. */}
+      <Route path="/members" element={<IntegrationReturnPage />} />
 
       {/* 한 사람이 여러 프로젝트를 가질 수 있어서, 보드/타임라인/팀원 등은 모두 특정 프로젝트 하위 경로다. */}
       <Route path="/projects/:projectId" element={<AppLayout />}>

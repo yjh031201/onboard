@@ -64,6 +64,13 @@ public class Card {
     @Column(name = "due_at")
     private LocalDateTime dueAt;
 
+    /** 담당자 — 카드에는 작성자 대신 이 사람이 보인다. 지정 안 했으면 null. */
+    @Column(name = "assignee_id")
+    private Long assigneeId;
+
+    @Column(name = "assignee_name", length = 100)
+    private String assigneeName;
+
     @Column(name = "created_by_id", nullable = false)
     private Long createdById;
 
@@ -84,6 +91,8 @@ public class Card {
             List<String> labelIds,
             String customLabel,
             LocalDateTime dueAt,
+            Long assigneeId,
+            String assigneeName,
             Long createdById,
             String createdByName
     ) {
@@ -94,6 +103,8 @@ public class Card {
         this.labelIds = new ArrayList<>(labelIds);
         this.customLabel = customLabel;
         this.dueAt = dueAt;
+        this.assigneeId = assigneeId;
+        this.assigneeName = assigneeName;
         this.createdById = createdById;
         this.createdByName = createdByName;
     }
@@ -125,6 +136,11 @@ public class Card {
         this.dueAt = dueAt;
     }
 
+    /** 담당자 변경 — 둘 다 null이면 담당자 없음. */
+    public void assign(Long assigneeId, String assigneeName) {
+        this.assigneeId = assigneeId;
+        this.assigneeName = assigneeName;
+    }
 
     @jakarta.persistence.PrePersist
     protected void onCreate() {
