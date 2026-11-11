@@ -66,12 +66,28 @@ public class ProjectFileService {
         }
 
         StoredFile stored = fileStorageService.store(file);
-        String originalName = StringUtils.cleanPath(Objects.requireNonNullElse(file.getOriginalFilename(), "file"));
+        String originalName = fitFileName(StringUtils.cleanPath(Objects.requireNonNullElse(file.getOriginalFilename(), "file")));
 
+        // content_type 칸은 100자 — 브라우저가 보낸 값이 이상하게 길거나 형식이 틀리면 저장하지 않는다(다운로드는 octet-stream).
+        String contentType = stored.contentType();
+        if (contentType != null && (contentType.length() > 100 || !contentType.matches("^[\\w.+-]+/[\\w.+-]+(;.*)?$"))) {
+            contentType = null;
+        }
         ProjectFile projectFile = new ProjectFile(
-                projectId, originalName, stored.fileKey(), stored.size(), stored.contentType(), currentUser.getId());
+                projectId, originalName, stored.fileKey(), stored.size(), contentType, currentUser.getId());
 
         return ProjectFileResponse.from(repository.save(projectFile), currentUser.getName());
+    }
+
+    /** file_name 칸은 255자 — 넘으면 확장자는 살리고 앞부분만 남긴다. */
+    static String fitFileName(String name) {
+        int max = 255;
+        if (name.length() <= max) {
+            return name;
+        }
+        int dot = name.lastIndexOf('.');
+        String ext = dot > 0 && name.length() - dot <= 11 ? name.substring(dot) : "";
+        return name.substring(0, max - ext.length()) + ext;
     }
 
     /** 다운로드할 파일 — 이 프로젝트의 멤버이고 파일도 이 프로젝트 것이어야 한다. */
