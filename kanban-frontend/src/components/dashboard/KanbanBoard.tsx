@@ -20,6 +20,7 @@ import { useProjectMembers } from "../../hooks/useProjectMembers";
 import type { CardStatus, TaskCard } from "../../types/dashboard";
 import CardFilterBar from "../kanban/CardFilterBar";
 import CardDetailModal from "../kanban/CardDetailModal";
+import CommentBadge from "../kanban/CommentBadge";
 import { CardDescription, CardEditForm, LabelPicker } from "../kanban/CardForms";
 import NewCardModal from "../kanban/NewCardModal";
 
@@ -236,6 +237,7 @@ export default function KanbanBoard({ projectId, columns, tasks, loading }: Kanb
                       <div className="flex w-full items-center justify-between gap-2 pl-[18px]">
                         <span className="min-w-0 truncate text-[11px] text-[#9ca3af]">{task.assigneeName}</span>
                         <span className="flex shrink-0 items-center gap-2">
+                          <CommentBadge projectId={projectId} task={task} />
                           {due && (
                             <span
                               className={`text-[11px] ${due.overdue ? "font-medium text-[#ef4444]" : "text-[#6b7280]"}`}

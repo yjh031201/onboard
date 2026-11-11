@@ -31,6 +31,7 @@ import {
 } from "./CardForms";
 import { toDueAt, useAutoGrow } from "./cardFormUtils";
 import { AttachmentList } from "./CardAttachments";
+import CardComments from "./CardComments";
 
 interface CardDetailModalProps {
   projectId: number;
@@ -387,6 +388,8 @@ export default function CardDetailModal({
                 </button>
               )}
             </div>
+
+            <CardComments projectId={projectId} cardId={task.id} isAdmin={isAdmin} />
           </>
         )}
       </div>

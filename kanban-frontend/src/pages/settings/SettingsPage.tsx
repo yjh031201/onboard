@@ -39,10 +39,14 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [managing, setManaging] = useState(false);
   const [manageError, setManageError] = useState<string | null>(null);
-  const [notifSettings, setNotifSettings] = useState(getNotificationSettings);
+  // 알림 설정은 프로젝트마다 따로 저장된다 — 다른 프로젝트 설정으로 옮겨 가도 그 프로젝트 값을 보여 주도록
+  // state에 담지 않고 그릴 때마다 읽는다 (localStorage 한 번 읽기라 가볍다). 토글하면 다시 그리기만 한다.
+  const [, refreshNotifSettings] = useState(0);
+  const notifSettings = getNotificationSettings(projectId);
 
   const updateNotifSetting = (key: keyof NotificationSettings, value: boolean) => {
-    setNotifSettings(setNotificationSetting(key, value));
+    setNotificationSetting(projectId, key, value);
+    refreshNotifSettings((n) => n + 1);
   };
 
   useEffect(() => {
@@ -231,6 +235,18 @@ export default function SettingsPage() {
             checked={notifSettings.dueDateNotif}
             onChange={(next) => updateNotifSetting("dueDateNotif", next)}
             label="마감일 알림"
+          />
+        </div>
+        <Divider />
+        <div className="flex w-full items-center justify-between">
+          <div className="flex flex-col gap-[3px]">
+            <p className="text-[13.5px] font-medium text-[#111827]">댓글 알림</p>
+            <p className="text-[12px] text-[#6b7280]">팀원이 카드에 댓글을 남기면 알려드려요</p>
+          </div>
+          <Toggle
+            checked={notifSettings.commentNotif}
+            onChange={(next) => updateNotifSetting("commentNotif", next)}
+            label="댓글 알림"
           />
         </div>
       </Section>
