@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -69,8 +70,9 @@ public class CardService {
         return listInternal(projectId);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CardResponse create(Long projectId, CreateCardRequest request, User actor) {
+        cardRepository.lockBoard(projectId);
         projectAccessService.requireMember(projectId, actor);
         BoardColumn column = findColumn(projectId, request.status());
         List<String> labelIds = validLabelIds(projectId, request.labelIds());
@@ -97,8 +99,13 @@ public class CardService {
         return toResponse(card);
     }
 
-    @Transactional
+    /**
+     * 카드 순서를 바꾸는 작업(create·move·delete)은 맨 먼저 보드를 잠그고(lockBoard), READ_COMMITTED로 읽는다 —
+     * MySQL 기본(REPEATABLE READ)이면 잠금을 기다리는 동안 다른 사람이 바꾼 순서를 못 보고 옛 값으로 계산한다.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CardResponse move(Long projectId, Long cardId, MoveCardRequest request, User actor) {
+        cardRepository.lockBoard(projectId);
         projectAccessService.requireMember(projectId, actor);
         Card card = findCard(projectId, cardId);
 
@@ -198,8 +205,9 @@ public class CardService {
         broadcastSnapshot(projectId, "CARD_LABEL_CHANGED", actor.getName());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void delete(Long projectId, Long cardId, User actor) {
+        cardRepository.lockBoard(projectId);
         projectAccessService.requireMember(projectId, actor);
         Card card = findCard(projectId, cardId);
         if (!isManageable(projectId, card, actor)) {
@@ -228,6 +236,11 @@ public class CardService {
         Card card = new Card(projectId, title, column.getId(), position, List.of(), null, null, null, null, actor.getId(), actor.getName());
         card.update(title, normalizeDescription(description), null);
         return cardRepository.save(card);
+    }
+
+    /** 보드 잠금 — 여러 카드를 한 번에 만드는 쪽(GitHub 이슈 가져오기)이 카드를 만들기 직전에 부른다. 트랜잭션 안에서만. */
+    public void lockBoard(Long projectId) {
+        cardRepository.lockBoard(projectId);
     }
 
     /** 이 프로젝트 멤버인지 확인하고 카드를 찾는다 — 첨부 기능(CardAttachmentService)이 쓴다. */

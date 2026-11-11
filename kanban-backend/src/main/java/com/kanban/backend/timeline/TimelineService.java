@@ -1,7 +1,7 @@
 package com.kanban.backend.timeline;
 
 import com.kanban.backend.common.ApiException;
-import com.kanban.backend.integration.slack.SlackIntegrationService;
+import com.kanban.backend.integration.slack.SlackNotifier;
 import com.kanban.backend.project.ProjectAccessService;
 import com.kanban.backend.realtime.RealtimeChannels;
 import com.kanban.backend.realtime.RealtimeEventPublisher;
@@ -21,18 +21,18 @@ public class TimelineService {
     private final TimelineEventRepository timelineEventRepository;
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final ProjectAccessService projectAccessService;
-    private final SlackIntegrationService slackIntegrationService;
+    private final SlackNotifier slackNotifier;
 
     public TimelineService(
             TimelineEventRepository timelineEventRepository,
             RealtimeEventPublisher realtimeEventPublisher,
             ProjectAccessService projectAccessService,
-            SlackIntegrationService slackIntegrationService
+            SlackNotifier slackNotifier
     ) {
         this.timelineEventRepository = timelineEventRepository;
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.projectAccessService = projectAccessService;
-        this.slackIntegrationService = slackIntegrationService;
+        this.slackNotifier = slackNotifier;
     }
 
     /** Persists a timeline entry and broadcasts it live to everyone on /topic/projects/{projectId}/timeline. */
@@ -47,7 +47,8 @@ public class TimelineService {
         TimelineEventResponse response = TimelineEventResponse.from(saved);
         realtimeEventPublisher.publish(RealtimeChannels.timelineEvents(projectId), response);
         if (notified) {
-            slackIntegrationService.notifyIfConnected(projectId, message);
+            // 저장이 확정(커밋)된 뒤 따로 보낸다 — Slack이 느려도 카드 작업은 기다리지 않는다.
+            slackNotifier.notifyAfterCommit(projectId, message);
         }
         return response;
     }
@@ -72,7 +73,9 @@ public class TimelineService {
     public List<TimelineEventResponse> recent(Long projectId, User actor, int limit) {
         projectAccessService.requireMember(projectId, actor);
 
-        return timelineEventRepository.findAllByProjectIdOrderByCreatedAtDesc(projectId, PageRequest.of(0, limit))
+        // 0 이하는 PageRequest가 거절해서 500이 났고, 아주 큰 값은 한 번에 너무 많이 읽는다 — 1~200으로 맞춘다.
+        int size = Math.max(1, Math.min(limit, 200));
+        return timelineEventRepository.findAllByProjectIdOrderByCreatedAtDesc(projectId, PageRequest.of(0, size))
                 .stream()
                 .map(TimelineEventResponse::from)
                 .toList();

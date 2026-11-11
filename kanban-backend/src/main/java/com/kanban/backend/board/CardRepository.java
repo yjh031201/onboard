@@ -16,6 +16,14 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     boolean existsByProjectIdAndStatus(Long projectId, String status);
 
+    /**
+     * 이 프로젝트의 카드 순서를 바꾸는 작업(추가·이동·삭제)을 한 번에 하나씩만 하도록 프로젝트 행을 잠근다.
+     * 트랜잭션이 끝날 때 풀린다. 동시에 카드를 옮기면 position이 겹치거나 비던 문제를 막는다.
+     * 결과가 없으면(없는 프로젝트) null.
+     */
+    @Query(value = "SELECT id FROM projects WHERE id = :projectId FOR UPDATE", nativeQuery = true)
+    Long lockBoard(@Param("projectId") Long projectId);
+
     @Query("select c from Card c where c.projectId = :projectId and :labelId member of c.labelIds")
     List<Card> findAllWithLabel(@Param("projectId") Long projectId, @Param("labelId") String labelId);
 

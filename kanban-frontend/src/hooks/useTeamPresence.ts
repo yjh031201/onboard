@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchPresenceRoster, toPresenceStatus, type PresenceEvent } from "../lib/presence";
-import { subscribeTopic } from "../lib/realtime";
+import { onRealtimeReconnect, subscribeTopic } from "../lib/realtime";
 import type { TeamMember } from "../types/dashboard";
 
 function toTeamMember(event: PresenceEvent): TeamMember {
@@ -19,9 +19,17 @@ export function useTeamPresence(projectId: number) {
   useEffect(() => {
     let cancelled = false;
 
-    fetchPresenceRoster(projectId).then((roster) => {
-      if (!cancelled) setMembers(roster.map(toTeamMember));
-    });
+    const load = () =>
+      fetchPresenceRoster(projectId)
+        .then((roster) => {
+          if (!cancelled) setMembers(roster.map(toTeamMember));
+        })
+        .catch(() => {
+          /* 실패하면 지금 명단을 그대로 둔다. */
+        });
+    void load();
+    // 끊긴 동안의 접속·종료는 이벤트로 못 받았으므로 다시 연결되면 명단을 새로 받는다.
+    const unsubscribeReconnect = onRealtimeReconnect(() => void load());
 
     const unsubscribe = subscribeTopic<PresenceEvent>(`/topic/projects/${projectId}/presence`, (event) => {
       setMembers((prev) => {
@@ -38,6 +46,7 @@ export function useTeamPresence(projectId: number) {
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeReconnect();
     };
   }, [projectId]);
 
