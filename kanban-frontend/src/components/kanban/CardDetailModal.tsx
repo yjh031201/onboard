@@ -31,6 +31,7 @@ import {
 } from "./CardForms";
 import { toDueAt, useAutoGrow } from "./cardFormUtils";
 import { AttachmentList } from "./CardAttachments";
+import CardComments from "./CardComments";
 
 interface CardDetailModalProps {
   projectId: number;
@@ -104,7 +105,7 @@ function formatDateTime(value: string): string {
   ).padStart(2, "0")}`;
 }
 
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+export function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex w-full items-start gap-3">
       <p className="w-[52px] shrink-0 pt-1 text-[12px] text-[#6b7280]">{label}</p>
@@ -387,6 +388,8 @@ export default function CardDetailModal({
                 </button>
               )}
             </div>
+
+            <CardComments projectId={projectId} cardId={task.id} isAdmin={isAdmin} />
           </>
         )}
       </div>

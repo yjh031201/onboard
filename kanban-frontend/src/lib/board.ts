@@ -40,10 +40,11 @@ interface CardDto {
   createdByName: string;
   createdAt: string;
   attachments?: CardAttachment[];
+  commentCount?: number;
 }
 
 export interface BoardEvent {
-  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED" | "CARD_DELETED";
+  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED" | "CARD_DELETED" | "CARD_COMMENTED";
   cards: CardDto[];
   actorName: string;
 }
@@ -63,6 +64,7 @@ function toTaskCard(dto: CardDto): TaskCard {
     createdByName: dto.createdByName,
     createdAt: dto.createdAt,
     attachments: dto.attachments ?? [],
+    commentCount: dto.commentCount ?? 0,
   };
 }
 
@@ -76,7 +78,7 @@ export function fetchCards(projectId: number): Promise<TaskCard[]> {
 
 /**
  * customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음).
- * assigneeId는 담당할 프로젝트 멤버의 userId, null이면 담당자 없음.
+ * assigneeId는 담당할 프로젝트 멤버의 userId, null이면 담당자 없음. description은 비우면(null) 설명 없음.
  */
 export function createCard(
   projectId: number,
@@ -86,10 +88,11 @@ export function createCard(
   customLabel: string | null,
   dueAt: string | null,
   assigneeId: number | null,
+  description: string | null = null,
 ): Promise<TaskCard> {
   return apiRequest<CardDto>(`/api/projects/${projectId}/cards`, {
     method: "POST",
-    body: JSON.stringify({ title, status, labelIds, customLabel, dueAt, assigneeId }),
+    body: JSON.stringify({ title, status, description, labelIds, customLabel, dueAt, assigneeId }),
   }).then(toTaskCard);
 }
 

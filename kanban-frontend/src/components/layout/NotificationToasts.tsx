@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { subscribeTopic } from "../../lib/realtime";
 import { getNotificationSettings } from "../../lib/notificationSettings";
+import { getStoredUser } from "../../lib/auth";
 import { useProjectId } from "../../hooks/useProjectId";
 import type { TimelineEventDto } from "../../types/dashboard";
 
@@ -18,8 +19,14 @@ export default function NotificationToasts() {
 
   useEffect(() => {
     return subscribeTopic<TimelineEventDto>(`/topic/projects/${projectId}/timeline`, (event) => {
-      if (!event.notified) return;
-      const settings = getNotificationSettings();
+      const settings = getNotificationSettings(projectId);
+      // 댓글은 서버가 Slack으로 보내지 않도록 notified=false로 기록하지만, 화면 알림은 설정에 따라 띄운다.
+      // 내가 쓴 댓글은 알리지 않는다.
+      if (event.type === "CARD_COMMENTED") {
+        if (!settings.commentNotif || event.actorId === getStoredUser()?.id) return;
+      } else if (!event.notified) {
+        return;
+      }
       if (event.type === "CARD_MOVED" && !settings.cardMoveNotif) return;
       if (event.type === "CARD_CREATED" && !settings.cardCreateNotif) return;
       if (event.type === "CARD_LABEL_CHANGED" && !settings.labelChangeNotif) return;
@@ -41,7 +48,7 @@ export default function NotificationToasts() {
           key={toast.toastId}
           className="flex items-start gap-2.5 rounded-xl border border-[#f0f0f2] bg-white p-3.5 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.12)]"
         >
-          <span className="mt-0.5 shrink-0 text-[14px]">🔔</span>
+          <span className="mt-0.5 shrink-0 text-[14px]">{toast.type === "CARD_COMMENTED" ? "💬" : "🔔"}</span>
           <p className="min-w-0 flex-1 break-keep text-[13px] text-[#111827] [overflow-wrap:anywhere]">{toast.message}</p>
         </div>
       ))}

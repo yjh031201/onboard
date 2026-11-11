@@ -44,6 +44,8 @@ export interface TaskCard {
   createdAt: string;
   /** 붙인 GitHub 이슈·Drive 파일 링크, 붙인 순서대로. */
   attachments: CardAttachment[];
+  /** 댓글 수 — 카드 앞면에 💬로 보인다. */
+  commentCount: number;
 }
 
 export type AttachmentKind = "GITHUB_ISSUE" | "DRIVE_FILE";
