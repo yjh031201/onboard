@@ -40,10 +40,11 @@ interface CardDto {
   createdByName: string;
   createdAt: string;
   attachments?: CardAttachment[];
+  commentCount?: number;
 }
 
 export interface BoardEvent {
-  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED" | "CARD_DELETED";
+  type: "CARD_CREATED" | "CARD_MOVED" | "CARD_UPDATED" | "CARD_LABEL_CHANGED" | "CARD_DELETED" | "CARD_COMMENTED";
   cards: CardDto[];
   actorName: string;
 }
@@ -63,6 +64,7 @@ function toTaskCard(dto: CardDto): TaskCard {
     createdByName: dto.createdByName,
     createdAt: dto.createdAt,
     attachments: dto.attachments ?? [],
+    commentCount: dto.commentCount ?? 0,
   };
 }
 
