@@ -104,7 +104,7 @@ function formatDateTime(value: string): string {
   ).padStart(2, "0")}`;
 }
 
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+export function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex w-full items-start gap-3">
       <p className="w-[52px] shrink-0 pt-1 text-[12px] text-[#6b7280]">{label}</p>

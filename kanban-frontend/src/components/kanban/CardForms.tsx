@@ -1,12 +1,11 @@
 // 카드 입력·수정 폼 — 칸반 페이지와 대시보드 칸반 위젯이 같이 쓴다.
 
-import { useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useState } from "react";
 import {
   MAX_CARD_DESCRIPTION_LENGTH,
   MAX_CARD_LABELS,
   alertCardError,
   normalizeCardTitle,
-  toggleLabelId,
   updateCard,
 } from "../../lib/board";
 import type { ColumnDef } from "../../lib/boardColumns";
@@ -119,98 +118,6 @@ export function AssigneeSelect({ id, members, value, onChange, currentName, bare
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-interface NewCardFormProps {
-  labels: LabelDef[];
-  members: ProjectMemberDto[];
-  /**
-   * customLabel은 "기타" 라벨에 직접 적은 글자(없으면 null). dueAt은 "YYYY-MM-DDTHH:mm" 또는 null(마감 없음).
-   * assigneeId는 담당자 userId, null이면 담당자 없음.
-   */
-  onSubmit: (
-    title: string,
-    labelIds: string[],
-    customLabel: string | null,
-    dueAt: string | null,
-    assigneeId: number | null,
-  ) => void;
-  onCancel: () => void;
-}
-
-/** 새 카드 입력 — Enter를 누르거나 폼 밖을 누르면 추가되고, 제목이 비었거나 Esc면 취소된다. */
-export function NewCardForm({ labels, members, onSubmit, onCancel }: NewCardFormProps) {
-  const [title, setTitle] = useState("");
-  const [labelIds, setLabelIds] = useState<string[]>([]);
-  const [customLabel, setCustomLabel] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [dueTime, setDueTime] = useState("");
-  const [assigneeId, setAssigneeId] = useState<number | null>(null);
-  // Enter로 닫히면서 blur가 한 번 더 불려도 카드가 두 장 생기지 않게 한다.
-  const closedRef = useRef(false);
-  const titleRef = useAutoGrow(title);
-
-  const close = (submit: boolean) => {
-    if (closedRef.current) return;
-    closedRef.current = true;
-    const trimmed = title.trim();
-    if (submit && trimmed) onSubmit(trimmed, labelIds, customLabel.trim() || null, toDueAt(dueDate, dueTime), assigneeId);
-    else onCancel();
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") close(false);
-    if (e.key === "Enter" && !e.nativeEvent.isComposing && !(e.target instanceof HTMLButtonElement)) {
-      e.preventDefault();
-      close(true);
-    }
-  };
-
-  // 포커스가 폼 안(라벨·마감 입력)으로 옮겨 간 것이면 아직 입력 중이다.
-  const handleBlur = (e: FocusEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) close(true);
-  };
-
-  return (
-    <div
-      // tabIndex: 폼의 빈 곳을 눌러도 포커스가 폼 안에 남아 카드가 추가되어 버리지 않는다.
-      tabIndex={-1}
-      onKeyDown={handleKeyDown}
-      onBlur={handleBlur}
-      className="flex w-full shrink-0 flex-col gap-2 rounded-lg border border-[#e5e7eb] bg-white p-2 focus:outline-none"
-    >
-      <textarea
-        ref={titleRef}
-        autoFocus
-        rows={1}
-        value={title}
-        onChange={(e) => setTitle(normalizeCardTitle(e.target.value))}
-        placeholder="카드 제목"
-        className={TITLE_INPUT_CLASS}
-      />
-      <div className="flex w-full items-start gap-2">
-        <p className="shrink-0 pt-0.5 text-[11.5px] text-[#6b7280]">라벨</p>
-        <LabelPicker
-          labels={labels}
-          selectedIds={labelIds}
-          onToggle={(labelId) => setLabelIds((prev) => toggleLabelId(prev, labelId))}
-          customLabel={customLabel}
-          onCustomLabelChange={setCustomLabel}
-          liveCustomLabel
-        />
-      </div>
-      <AssigneeSelect id="new-card-assignee" members={members} value={assigneeId} onChange={setAssigneeId} />
-      <DueInputs
-        id="new-card-due"
-        date={dueDate}
-        time={dueTime}
-        onChange={(date, time) => {
-          setDueDate(date);
-          setDueTime(time);
-        }}
-      />
     </div>
   );
 }

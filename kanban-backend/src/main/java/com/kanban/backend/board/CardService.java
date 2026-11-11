@@ -77,11 +77,13 @@ public class CardService {
         String customLabel = normalizeCustomLabel(projectId, labelIds, request.customLabel());
         User assignee = findAssignee(projectId, request.assigneeId());
         int position = cardRepository.findAllByProjectIdAndStatusOrderByPositionAsc(projectId, column.getId()).size();
-        Card card = cardRepository.save(new Card(
+        Card card = new Card(
                 projectId, request.title().trim(), column.getId(), position, labelIds, customLabel, request.dueAt(),
                 assignee == null ? null : assignee.getId(), assignee == null ? null : assignee.getName(),
                 actor.getId(), actor.getName()
-        ));
+        );
+        card.update(card.getTitle(), normalizeDescription(request.description()), request.dueAt());
+        card = cardRepository.save(card);
 
         timelineService.record(
                 projectId,
