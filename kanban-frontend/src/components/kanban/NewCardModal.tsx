@@ -10,7 +10,6 @@ import {
   createCard,
   normalizeCardTitle,
   toggleLabelId,
-  updateCard,
 } from "../../lib/board";
 import type { ColumnDef } from "../../lib/boardColumns";
 import type { LabelDef } from "../../lib/labels";
@@ -70,7 +69,8 @@ export default function NewCardModal({ projectId, column, labels, members, onClo
 
     setSaving(true);
     try {
-      const card = await createCard(
+      // 설명까지 한 번에 보낸다 — 요청이 하나라 중간에 실패해서 카드가 반만 만들어지는 일이 없다.
+      await createCard(
         projectId,
         trimmedTitle,
         column.id,
@@ -78,11 +78,8 @@ export default function NewCardModal({ projectId, column, labels, members, onClo
         hasEtc ? customLabel.trim() || null : null,
         dueAt,
         assigneeId,
+        trimmedDescription || null,
       );
-      // 카드 생성 API에는 설명이 없어서, 적었으면 만든 뒤 이어서 저장한다.
-      if (trimmedDescription) {
-        await updateCard(projectId, card.id, trimmedTitle, trimmedDescription, dueAt, assigneeId);
-      }
       onClose();
     } catch (err) {
       alertCardError(err, "카드를 추가하지 못했어요.");

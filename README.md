@@ -161,9 +161,9 @@ npm run dev
 | `DELETE /api/projects/{id}/cards/{cardId}/attachments/{attachmentId}` | **신규** |
 | 카드 응답 | `attachments` 추가 |
 
-**DB 마이그레이션 `V20__add_card_attachments.sql`** — `card_attachments` 테이블 (카드 삭제 시 같이 삭제)
+**DB 마이그레이션 `V22__add_card_attachments.sql`** — `card_attachments` 테이블 (카드 삭제 시 같이 삭제)
 
-> 새 마이그레이션은 **V21부터** 만들어 주세요.
+> 새 마이그레이션은 **V25부터** 만들어 주세요. (현재 마지막: `V24__add_card_comments.sql`)
 
 ## 구글 / 네이버 로그인 설정
 
