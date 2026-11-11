@@ -81,10 +81,32 @@ export async function publicRequest<T>(path: string, options: RequestInit = {}):
   return toResult<T>(res);
 }
 
+let refreshing: Promise<string | null> | null = null;
+
+/**
+ * refresh 쿠키로 새 access token을 받아 저장하고 돌려준다. 실패하면 null.
+ * 동시에 여러 요청이 401을 받아도 서버에는 한 번만 요청한다 — refresh token은 쓸 때마다 새것으로 바뀌어서,
+ * 두 번 보내면 두 번째는 이미 바뀐 옛 토큰이라 거절되고 로그아웃돼 버린다.
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  refreshing ??= fetch(`${API_BASE_URL}/api/auth/refresh`, { method: "POST", credentials: "include" })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const body = (await res.json()) as { accessToken: string; user: unknown };
+      setSession(body.accessToken, body.user);
+      return body.accessToken;
+    })
+    .catch(() => null)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
 /**
  * 로그인 토큰이 필요한 모든 API 호출은 이 함수로.
  * - Authorization: Bearer <토큰> 헤더 자동 첨부
- * - 401(토큰 만료/무효) 응답이면 세션 정리하고 로그인 페이지로 자동 이동
+ * - 401(토큰 만료)이면 refresh 쿠키로 토큰을 새로 받아 한 번 다시 보낸다. 그것도 안 되면 세션 정리 후 로그인 페이지로
  * - body가 FormData(파일 업로드)면 Content-Type은 브라우저가 boundary와 함께 채우도록 비워둠
  */
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -98,7 +120,7 @@ export async function apiBlob(path: string): Promise<Blob> {
   return res.blob();
 }
 
-async function authorizedFetch(path: string, options: RequestInit = {}): Promise<Response> {
+async function authorizedFetch(path: string, options: RequestInit = {}, retried = false): Promise<Response> {
   const token = getToken();
   const isFormData = options.body instanceof FormData;
 
@@ -111,6 +133,13 @@ async function authorizedFetch(path: string, options: RequestInit = {}): Promise
       ...options.headers,
     },
   });
+
+  if (res.status === 401 && !retried) {
+    // 다른 탭이 그 사이 이미 새 토큰을 받아 뒀으면 그걸 쓰고, 아니면 직접 새로 받는다.
+    const current = getToken();
+    const fresh = current && current !== token ? current : await refreshAccessToken();
+    if (fresh) return authorizedFetch(path, options, true);
+  }
 
   if (res.status === 401) {
     clearSession();

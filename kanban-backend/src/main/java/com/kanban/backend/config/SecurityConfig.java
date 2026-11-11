@@ -67,8 +67,10 @@ public class SecurityConfig {
                         "/api/auth/signup",
                         "/api/auth/login",
                         "/api/auth/find-id",
-                        "/api/auth/reset-password",
+                        "/api/auth/password-reset/request",
+                        "/api/auth/password-reset/confirm",
                         "/api/auth/refresh",
+                        "/api/auth/logout",
                         "/api/auth/oauth/exchange"
                         ).permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()

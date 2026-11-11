@@ -67,6 +67,12 @@ services:
       SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-dummy-slack-client-secret}
       GOOGLE_DRIVE_CLIENT_ID: ${GOOGLE_DRIVE_CLIENT_ID:-dummy-google-drive-client-id}
       GOOGLE_DRIVE_CLIENT_SECRET: ${GOOGLE_DRIVE_CLIENT_SECRET:-dummy-google-drive-client-secret}
+      # 비밀번호 재설정 인증 코드 메일(SMTP). 비어 있으면 비밀번호 재설정만 막히고 나머지는 정상 동작.
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     depends_on:
       mysql:
         condition: service_healthy

@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Optional;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
@@ -46,6 +47,8 @@ public class JwtTokenProvider {
 
         if (type != null) {
             builder.claim(CLAIM_TYPE, type);
+            // refresh token은 기기마다 따로 저장·폐기하므로 같은 초에 발급돼도 서로 달라야 한다.
+            builder.id(UUID.randomUUID().toString());
         }
 
         return builder.signWith(key).compact();

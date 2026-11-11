@@ -59,8 +59,13 @@ export function signup(
   });
 }
 
+/** 서버에도 알려서 refresh 쿠키를 지운다 — 안 그러면 로그아웃해도 그 브라우저에서 로그인을 다시 연장할 수 있다. */
 export function logout() {
   clearSession();
+  // 화면 이동을 기다리게 하지 않는다. keepalive로 페이지를 떠나도 요청은 끝까지 간다.
+  fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST", credentials: "include", keepalive: true }).catch(() => {
+    // 서버에 못 알려도 이 브라우저의 로그인 정보는 이미 지웠다.
+  });
 }
 
 export interface FindIdResponse {
@@ -75,11 +80,19 @@ export function findId(name: string, phone: string): Promise<FindIdResponse> {
   });
 }
 
-/** 이름+이메일 일치 확인 후 새 비밀번호로 즉시 교체 (이메일 발송 없는 간소화된 플로우). */
-export function resetPassword(name: string, email: string, newPassword: string): Promise<void> {
-  return publicRequest<void>("/api/auth/reset-password", {
+/** 비밀번호 재설정 1단계 — 이메일로 6자리 인증 코드를 보낸다 (가입 안 된 이메일도 같은 응답). */
+export function requestPasswordResetCode(email: string): Promise<void> {
+  return publicRequest<void>("/api/auth/password-reset/request", {
     method: "POST",
-    body: JSON.stringify({ name, email, newPassword }),
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** 비밀번호 재설정 2단계 — 메일로 받은 코드가 맞으면 새 비밀번호로 바뀐다. */
+export function confirmPasswordReset(email: string, code: string, newPassword: string): Promise<void> {
+  return publicRequest<void>("/api/auth/password-reset/confirm", {
+    method: "POST",
+    body: JSON.stringify({ email, code, newPassword }),
   });
 }
 

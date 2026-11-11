@@ -4,8 +4,9 @@ import com.kanban.backend.auth.dto.AuthResponse;
 import com.kanban.backend.auth.dto.FindIdRequest;
 import com.kanban.backend.auth.dto.FindIdResponse;
 import com.kanban.backend.auth.dto.LoginRequest;
-import com.kanban.backend.auth.dto.ResetPasswordRequest;
 import com.kanban.backend.auth.dto.OAuthExchangeRequest;
+import com.kanban.backend.auth.dto.PasswordResetCodeRequest;
+import com.kanban.backend.auth.dto.PasswordResetConfirmRequest;
 import com.kanban.backend.auth.dto.SignupRequest;
 import com.kanban.backend.auth.dto.UserResponse;
 import com.kanban.backend.common.ApiException;
@@ -34,15 +35,18 @@ public class AuthController {
     private static final String REFRESH_COOKIE_PATH = "/api/auth";
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
     private final long refreshExpirationMs;
     private final boolean cookieSecure;
 
     public AuthController(
             AuthService authService,
+            PasswordResetService passwordResetService,
             @Value("${jwt.refresh-expiration-ms}") long refreshExpirationMs,
             @Value("${app.cookie-secure}") boolean cookieSecure
     ) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
         this.refreshExpirationMs = refreshExpirationMs;
         this.cookieSecure = cookieSecure;
     }
@@ -72,9 +76,17 @@ public class AuthController {
         return ResponseEntity.ok(authService.findId(request));
     }
 
-    @PostMapping("/reset-password")
-    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        authService.resetPassword(request);
+    /** 비밀번호 재설정 1단계 — 가입 여부와 상관없이 같은 응답(204)을 준다. */
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetCodeRequest request) {
+        passwordResetService.requestCode(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 비밀번호 재설정 2단계 — 메일로 받은 코드가 맞으면 새 비밀번호로 바꾸고 다른 기기의 로그인을 끊는다. */
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        passwordResetService.confirm(request.email(), request.code(), request.newPassword());
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/refresh")
@@ -103,8 +115,12 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal User user, HttpServletResponse response) {
-        authService.logout(user.getId());
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = REFRESH_COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+        // access token이 이미 만료된 상태에서도 로그아웃은 돼야 하므로, 인증 없이 refresh 쿠키로 처리한다.
+        authService.logout(refreshToken);
         clearRefreshCookie(response);
         return ResponseEntity.noContent().build();
     }

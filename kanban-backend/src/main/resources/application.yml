@@ -27,6 +27,16 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+  # 비밀번호 재설정 인증 코드 메일 발송용 SMTP. 값이 없으면 재설정 요청을 거절한다 (app.mail-from 참고).
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
   servlet:
     multipart:
       max-file-size: ${UPLOAD_MAX_FILE_SIZE:50MB}
@@ -117,3 +127,8 @@ app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   # refresh token 쿠키의 Secure 속성. 로컬 http 개발은 false, HTTPS 배포 후에는 반드시 true로.
   cookie-secure: ${COOKIE_SECURE:false}
+  # 비밀번호 재설정 인증 코드 메일. MAIL_HOST가 비어 있으면 메일을 보내지 않고 재설정 요청을 503으로 거절한다.
+  # (예: Gmail SMTP — MAIL_HOST=smtp.gmail.com, MAIL_PORT=587, MAIL_USERNAME=주소, MAIL_PASSWORD=앱 비밀번호)
+  mail-from: ${MAIL_FROM:${MAIL_USERNAME:}}
+  # 로컬 개발에서 메일 서버 없이 테스트할 때만 true — 인증 코드를 서버 로그에 찍는다. 운영에서는 절대 켜지 말 것.
+  password-reset-log-code: ${PASSWORD_RESET_LOG_CODE:false}
