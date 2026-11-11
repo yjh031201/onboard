@@ -10,12 +10,12 @@ import {
   canManageCard,
   changeCardLabels,
   confirmAndDeleteCard,
-  createCard,
   describeDue,
   moveCard,
   toggleLabelId,
 } from "../../lib/board";
-import { CardDescription, CardEditForm, LabelPicker, NewCardForm } from "../../components/kanban/CardForms";
+import { CardDescription, CardEditForm, LabelPicker } from "../../components/kanban/CardForms";
+import NewCardModal from "../../components/kanban/NewCardModal";
 import CardFilterBar from "../../components/kanban/CardFilterBar";
 import CardDetailModal from "../../components/kanban/CardDetailModal";
 import { getStoredUser } from "../../lib/auth";
@@ -39,6 +39,8 @@ export default function KanbanPage() {
   const [filter, setFilter] = useState(EMPTY_CARD_FILTER);
   // 최신 스냅샷에서 찾는다 — 그 사이 삭제된 카드면 undefined라 창이 닫힌다.
   const detailTask = detailId ? tasks.find((task) => task.id === detailId) : undefined;
+  // [+ 새 작업 추가]를 누른 컬럼 — 그 사이 컬럼이 지워지면 undefined라 창이 닫힌다.
+  const addingColumn = addingTo ? columns.find((column) => column.id === addingTo) : undefined;
 
   // 설정에서 지워진 라벨이 필터에 남아 있으면, 버튼은 사라졌는데 카드만 계속 걸러지므로 뺀다.
   const activeFilter = { ...filter, labelIds: filter.labelIds.filter((id) => labels.some((label) => label.id === id)) };
@@ -59,18 +61,6 @@ export default function KanbanPage() {
     // 다른 사람이 카드를 옮겼을 때와 동일한 경로로 내 화면도 갱신된다. 화면은 바뀐 적이 없으니 롤백은 필요 없고,
     // 왜 안 옮겨졌는지(보관된 프로젝트 등)만 알려 준다.
     moveCard(projectId, draggingId, status, targetIndex).catch((err) => alertCardError(err, "카드를 옮기지 못했어요."));
-  };
-
-  const submitNewCard = (
-    status: CardStatus,
-    title: string,
-    labelIds: string[],
-    customLabel: string | null,
-    dueAt: string | null,
-    assigneeId: number | null,
-  ) => {
-    setAddingTo(null);
-    createCard(projectId, title, status, labelIds, customLabel, dueAt, assigneeId).catch((err) => alertCardError(err, "카드를 추가하지 못했어요."));
   };
 
   const toggleCardLabel = (task: TaskCard, labelId: string) => {
@@ -282,29 +272,29 @@ export default function KanbanPage() {
                 })}
               </div>
 
-              {addingTo === column.id ? (
-                <NewCardForm
-                  labels={labels}
-                  members={members}
-                  onSubmit={(title, labelIds, customLabel, dueAt, assigneeId) =>
-                    submitNewCard(column.id, title, labelIds, customLabel, dueAt, assigneeId)
-                  }
-                  onCancel={() => setAddingTo(null)}
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setAddingTo(column.id)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-medium text-[#6b7280] hover:bg-[#f0f0f2]"
-                >
-                  <span>+</span>
-                  <span>새 작업 추가</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setAddingTo(column.id)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-medium text-[#6b7280] hover:bg-[#f0f0f2]"
+              >
+                <span>+</span>
+                <span>새 작업 추가</span>
+              </button>
             </div>
           );
         })}
       </div>
+      {addingColumn && (
+        // key: 다른 컬럼에서 열면 입력값을 새로 시작한다.
+        <NewCardModal
+          key={addingColumn.id}
+          projectId={projectId}
+          column={addingColumn}
+          labels={labels}
+          members={members}
+          onClose={() => setAddingTo(null)}
+        />
+      )}
       {detailTask && (
         <CardDetailModal
           projectId={projectId}
