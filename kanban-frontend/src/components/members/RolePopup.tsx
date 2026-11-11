@@ -17,6 +17,13 @@ export default function RolePopup({ projectId, member, onClose, onUpdated }: Rol
   const [submitting, setSubmitting] = useState(false);
 
   const handleSave = async () => {
+    if (role === member.role) {
+      onClose();
+      return;
+    }
+    if (role === "OWNER" && !window.confirm(`${member.name}님에게 소유자를 넘길까요? 나는 관리자가 되고, 되돌리려면 새 소유자가 다시 넘겨줘야 해요.`)) {
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -46,7 +53,7 @@ export default function RolePopup({ projectId, member, onClose, onUpdated }: Rol
           </button>
         </div>
 
-        <RoleCheckboxes value={role} onChange={setRole} />
+        <RoleCheckboxes value={role} onChange={setRole} allowOwner />
 
         {error && (
           <div className="w-full rounded-[10px] bg-[#fef2f2] px-4 py-3">

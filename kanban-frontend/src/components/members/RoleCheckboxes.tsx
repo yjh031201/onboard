@@ -1,24 +1,23 @@
 // 팀원 권한을 고르는 체크박스 — 실제로는 OWNER/ADMIN/MEMBER 중 하나만 고를 수 있는 단일 선택.
 export type Role = "OWNER" | "ADMIN" | "MEMBER";
 
-// 실제 서버 권한 체크(ProjectAccessService.requireAdmin)를 그대로 설명한 것 — 소유자/관리자는
-// 권한상 동일(둘 다 "관리자 이상"으로 취급)하고, 멤버와의 차이는 팀원 초대·권한 변경 가능 여부와
-// 남의 카드/파일/일정까지 관리할 수 있는지 여부다. 초대·권한 변경 화면에서 바로 보이게 설명을 붙인다.
+// 서버 권한 규칙(ProjectAccessService, ProjectMemberService)을 그대로 설명한 것.
+// 소유자는 프로젝트마다 한 명이라 초대로는 고를 수 없고, 권한 변경 창에서 "소유자 넘기기"로만 고른다.
 const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
   {
     value: "OWNER",
-    label: "소유자",
-    description: "프로젝트를 만든 사람에게 자동으로 부여돼요. 관리자와 동일하게 모든 권한을 가져요.",
+    label: "소유자 넘기기",
+    description: "이 팀원이 소유자가 되고, 나는 관리자가 돼요. 소유자는 프로젝트마다 한 명이고, 팀원 권한 변경과 프로젝트 삭제를 할 수 있어요.",
   },
   {
     value: "ADMIN",
     label: "관리자",
-    description: "소유자와 동일한 권한이에요. 팀원을 초대하고 권한을 바꿀 수 있고, 다른 사람의 카드·파일·일정도 수정·삭제할 수 있어요.",
+    description: "팀원을 초대하고 연동을 관리할 수 있고, 다른 사람의 카드·파일·일정도 수정·삭제할 수 있어요. 권한 변경과 프로젝트 삭제는 소유자만 해요.",
   },
   {
     value: "MEMBER",
     label: "멤버",
-    description: "보드·라벨·일정은 자유롭게 쓸 수 있지만 팀원 초대나 권한 변경은 할 수 없고, 본인이 만든 카드·파일·일정만 수정·삭제할 수 있어요.",
+    description: "보드·라벨·일정은 자유롭게 쓸 수 있지만 팀원 초대는 할 수 없고, 본인이 만든 카드·파일·일정만 수정·삭제할 수 있어요.",
   },
 ];
 
@@ -35,12 +34,15 @@ export function roleLabel(role: string): string {
 interface RoleCheckboxesProps {
   value: Role;
   onChange: (role: Role) => void;
+  /** 소유자 넘기기를 보여 줄지 — 초대 화면에서는 false. */
+  allowOwner?: boolean;
 }
 
-export default function RoleCheckboxes({ value, onChange }: RoleCheckboxesProps) {
+export default function RoleCheckboxes({ value, onChange, allowOwner = false }: RoleCheckboxesProps) {
+  const options = allowOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter((option) => option.value !== "OWNER");
   return (
     <div className="flex w-full flex-col gap-2.5">
-      {ROLE_OPTIONS.map((option) => (
+      {options.map((option) => (
         <label
           key={option.value}
           className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg border border-[#e5e7eb] px-3.5 py-3 has-[:checked]:border-[#6366f1] has-[:checked]:bg-[#eeeefe]"
