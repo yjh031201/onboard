@@ -28,7 +28,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   // 소셜 로그인 실패 시 백엔드가 /login?oauthError=... 로 돌려보낸 메시지를 초기값으로 표시.
   const [error, setError] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get("oauthError"),
@@ -69,16 +68,8 @@ export default function LoginPage() {
           required
         />
 
-        <div className="flex w-full items-center justify-between">
-          <label className="flex items-center gap-2 text-[12.5px] text-[#6b7280]">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="size-4 rounded border-[#e5e7eb]"
-            />
-            로그인 상태 유지
-          </label>
+        {/* "로그인 상태 유지" 체크박스는 아무 동작이 없어서 뺐다 — 로그인은 refresh token으로 자동 연장된다(최대 2주). */}
+        <div className="flex w-full items-center justify-end">
           <Link to="/find-password" className="text-[12.5px] font-medium text-[#6366f1]">
             비밀번호 찾기
           </Link>

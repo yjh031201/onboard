@@ -29,7 +29,10 @@ export default function ProjectSelectPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const { invitations, loading: invitationsLoading, accept, decline } = useInvitations();
+  const { invitations, loading: invitationsLoading, accept, decline, reload: reloadInvitations } = useInvitations();
+  // 초대 카드의 수락·거절 — 누르는 동안 버튼을 막고, 실패하면(초대가 취소됐거나 프로젝트가 삭제됨 등) 이유를 보여 준다.
+  const [inviteBusyId, setInviteBusyId] = useState<number | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   // 게스트 계정은 프로젝트를 새로 만들 수 없고 초대받아 참여만 가능(서버에서도 403으로 막음) —
   // "+ 새 프로젝트" 버튼 자체를 안 보여줘서 눌러도 에러나는 상황을 미리 피한다.
   const isGuest = getStoredUser()?.isGuest ?? false;
@@ -49,6 +52,19 @@ export default function ProjectSelectPage() {
 
   // 초대를 수락하면 그 프로젝트가 바로 "내 프로젝트" 목록에도 나타나야 하니 같이 새로고침한다.
   const handleAccept = (projectId: number) => accept(projectId).then(() => loadProjects());
+
+  const respondToInvite = async (action: (projectId: number) => Promise<unknown>, projectId: number) => {
+    setInviteBusyId(projectId);
+    setInviteError(null);
+    try {
+      await action(projectId);
+    } catch (err) {
+      setInviteError(err instanceof ApiError ? err.message : "초대를 처리하지 못했어요. 잠시 후 다시 시도해주세요.");
+      reloadInvitations(); // 이미 없어진 초대면 목록에서 사라진다.
+    } finally {
+      setInviteBusyId(null);
+    }
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#fafafa]">
@@ -78,6 +94,11 @@ export default function ProjectSelectPage() {
         {invitations.length > 0 && (
           <div className="flex flex-col gap-3.5">
             <h2 className="text-[15.5px] font-bold text-[#111827]">나에게 온 초대</h2>
+            {inviteError && (
+              <div className="w-full max-w-[660px] rounded-[10px] bg-[#fef2f2] px-4 py-3">
+                <p className="text-[13px] text-[#ef4444]">{inviteError}</p>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4">
               {invitations.map((invite) => (
                 <div
@@ -90,10 +111,20 @@ export default function ProjectSelectPage() {
                   )}
                   <p className="text-[12px] text-[#6b7280]">{roleLabel(invite.role)}(으)로 초대받았어요</p>
                   <div className="flex w-full justify-end gap-2 pt-1">
-                    <Button variant="secondary" onClick={() => decline(invite.projectId)} className="px-3.5 py-1.5 text-[12.5px]">
+                    <Button
+                      variant="secondary"
+                      onClick={() => void respondToInvite(decline, invite.projectId)}
+                      disabled={inviteBusyId === invite.projectId}
+                      className="px-3.5 py-1.5 text-[12.5px] disabled:opacity-60"
+                    >
                       거절
                     </Button>
-                    <Button variant="primary" onClick={() => handleAccept(invite.projectId)} className="px-3.5 py-1.5 text-[12.5px]">
+                    <Button
+                      variant="primary"
+                      onClick={() => void respondToInvite(handleAccept, invite.projectId)}
+                      disabled={inviteBusyId === invite.projectId}
+                      className="px-3.5 py-1.5 text-[12.5px] disabled:opacity-60"
+                    >
                       수락
                     </Button>
                   </div>

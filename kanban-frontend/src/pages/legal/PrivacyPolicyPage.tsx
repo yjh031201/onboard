@@ -1,3 +1,5 @@
+const GOOGLE_USER_DATA_POLICY_URL = "https://developers.google.com/terms/api-services-user-data-policy";
+
 export default function PrivacyPolicyPage() {
   return (
     <div className="flex min-h-screen w-full justify-center bg-[#fafafa] px-6 py-16">
@@ -24,11 +26,19 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc pl-5">
             <li>회원 인증 및 팀 협업 기능(칸반보드, 타임라인, 실시간 알림) 제공</li>
             <li>사용자가 직접 연결한 경우에 한해 GitHub 이슈 조회, Slack 알림 전송, Google Drive 파일 목록 조회</li>
+            <li>비밀번호 재설정을 요청한 경우 가입한 이메일로 인증 코드 발송</li>
           </ul>
         </Section>
 
         <Section title="3. 제3자 제공">
           <p>수집한 정보를 외부에 판매하거나 제공하지 않습니다. 연동 서비스(GitHub/Slack/Google)의 데이터는 사용자 본인의 요청을 처리하는 목적으로만 사용되며, 다른 목적으로 전송되지 않습니다.</p>
+          <p className="mt-2">
+            Google API로 받은 정보의 사용 및 다른 앱으로의 전송은 제한적 사용(Limited Use) 요건을 포함한{" "}
+            <a href={GOOGLE_USER_DATA_POLICY_URL} target="_blank" rel="noreferrer" className="font-medium text-[#6366f1]">
+              Google API 서비스 사용자 데이터 정책
+            </a>
+            을 준수합니다.
+          </p>
         </Section>
 
         <Section title="4. 보관 기간">
