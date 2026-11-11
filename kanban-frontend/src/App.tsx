@@ -15,7 +15,6 @@ import MembersPage from "./pages/members/MembersPage";
 import IntegrationReturnPage from "./pages/members/IntegrationReturnPage";
 import FilesPage from "./pages/files/FilesPage";
 import SettingsPage from "./pages/settings/SettingsPage";
-import PrivacyPage from "./pages/PrivacyPage";
 
 function App() {
   return (
@@ -27,8 +26,6 @@ function App() {
       <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
-
-      <Route path="/privacy" element={<PrivacyPage />} />
 
       <Route path="/" element={<HomePage />} />
 

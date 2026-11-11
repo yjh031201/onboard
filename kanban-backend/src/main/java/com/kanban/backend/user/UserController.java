@@ -5,7 +5,6 @@ import com.kanban.backend.user.dto.ChangePasswordRequest;
 import com.kanban.backend.user.dto.DeleteAccountRequest;
 import com.kanban.backend.user.dto.UpdateProfileRequest;
 import jakarta.validation.Valid;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -57,11 +56,8 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 멤버 초대용 후보 검색 — 가입된 전체 사용자 목록(프로젝트 소속 여부와 무관). */
-    @GetMapping
-    public ResponseEntity<List<UserResponse>> list() {
-        return ResponseEntity.ok(userService.listAll());
-    }
+    // 예전의 GET /api/users(가입자 전체 이메일·휴대폰 목록)는 로그인만 하면 누구나 볼 수 있어서 없앴다 — 화면에서는 쓰지 않았다.
+    // 팀원 초대는 아래 검색(이메일·휴대폰을 정확히 알아야 찾힘)으로 한다.
 
     /** 팀원 초대용 — 이메일 또는 휴대폰번호로 이미 가입된 사용자 검색. */
     @GetMapping("/search")

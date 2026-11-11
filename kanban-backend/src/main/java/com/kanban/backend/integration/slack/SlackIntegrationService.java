@@ -151,7 +151,13 @@ public class SlackIntegrationService {
     public void sendTestMessage(Long projectId) {
         Integration integration = integrationService.requireConnected(
                 projectId, IntegrationProvider.SLACK, "이 프로젝트에 Slack이 연결되어 있지 않습니다.");
-        postToWebhook(integration.getSlackWebhookUrl(), "🔔 칸반보드 Slack 연동 테스트 메시지입니다.");
+        try {
+            postToWebhook(integration.getSlackWebhookUrl(), "🔔 칸반보드 Slack 연동 테스트 메시지입니다.");
+        } catch (RuntimeException e) {
+            // 웹훅이 Slack에서 삭제됐거나 Slack이 응답하지 않으면 예전엔 500 "서버 오류"로만 보였다.
+            throw new ApiException(HttpStatus.BAD_GATEWAY,
+                    "Slack으로 메시지를 보내지 못했어요. Slack에서 웹훅이 삭제됐다면 연동을 해제하고 다시 연결해주세요.");
+        }
     }
 
     /**

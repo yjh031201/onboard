@@ -4,7 +4,6 @@ import com.kanban.backend.auth.dto.AuthResponse;
 import com.kanban.backend.auth.dto.FindIdRequest;
 import com.kanban.backend.auth.dto.FindIdResponse;
 import com.kanban.backend.auth.dto.LoginRequest;
-import com.kanban.backend.auth.dto.ResetPasswordRequest;
 import com.kanban.backend.auth.dto.SignupRequest;
 import com.kanban.backend.auth.dto.UserResponse;
 import com.kanban.backend.auth.oauth2.OAuthCodeExchangeService;
@@ -86,6 +85,8 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
 
+        // 쓴 토큰은 버리고 새 토큰으로 바꾼다 — 이 기기의 세션만 교체되고 다른 기기의 로그인은 그대로.
+        refreshTokenStore.revoke(userId, refreshToken);
         return issueToken(user);
     }
 
@@ -99,9 +100,13 @@ public class AuthService {
         return issueToken(user);
     }
 
-    /** 로그아웃 시 Redis에 저장된 refresh token을 지워서 즉시 무효화한다. */
-    public void logout(Long userId) {
-        refreshTokenStore.invalidate(userId);
+    /** 로그아웃 — 이 기기(쿠키)의 refresh token만 Redis에서 지운다. 다른 기기의 로그인은 그대로. */
+    public void logout(String refreshToken) {
+        if (refreshToken == null) {
+            return;
+        }
+        jwtTokenProvider.parseRefreshUserId(refreshToken)
+                .ifPresent(userId -> refreshTokenStore.revoke(userId, refreshToken));
     }
 
     private AuthResult issueToken(User user) {
@@ -122,19 +127,8 @@ public class AuthService {
         return new FindIdResponse(maskEmail(user.getEmail()));
     }
 
-    /**
-     * 이름+이메일 일치 여부로 본인 확인 후 새 비밀번호로 즉시 교체.
-     * (이메일 발송 없는 간소화된 플로우 — AuthService.signup과 동일하게 CONFLICT/NOT_FOUND는 ApiException으로 처리)
-     */
-    @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .filter(found -> found.getName().equals(request.name()))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "일치하는 회원 정보를 찾을 수 없습니다."));
-
-        user.changePassword(passwordEncoder.encode(request.newPassword()));
-        // user는 영속 상태(managed)이므로 트랜잭션 커밋 시 변경분이 자동 반영됨(dirty checking).
-    }
+    // 비밀번호 재설정은 이메일 인증 코드 방식으로 PasswordResetService가 맡는다 — 예전의 "이름+이메일만 맞으면
+    // 바로 변경"은 남의 계정을 가져갈 수 있는 구멍이라 없앴다.
 
     private String maskEmail(String email) {
         int at = email.indexOf('@');

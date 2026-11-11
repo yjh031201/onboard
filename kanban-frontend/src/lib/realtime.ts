@@ -7,7 +7,7 @@
 
 import { Client, type IMessage, type StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import { API_BASE_URL, getToken } from "./api";
+import { API_BASE_URL, getToken, refreshAccessToken } from "./api";
 
 type Handler<T> = (payload: T) => void;
 
@@ -18,6 +18,20 @@ interface TopicEntry {
 
 const topics = new Map<string, TopicEntry>();
 let client: Client | null = null;
+/** 이번 로그인에서 한 번이라도 연결됐는지 — 그 뒤의 연결은 "재연결"이다. */
+let connectedBefore = false;
+const reconnectListeners = new Set<() => void>();
+
+/**
+ * 끊겼다가 다시 연결됐을 때 부를 함수를 등록한다 (서버 재시작·네트워크 끊김 등).
+ * 끊긴 동안 온 이벤트는 받지 못했으므로, 처음에 REST로 불러온 데이터를 다시 불러오는 데 쓴다.
+ */
+export function onRealtimeReconnect(listener: () => void): () => void {
+  reconnectListeners.add(listener);
+  return () => {
+    reconnectListeners.delete(listener);
+  };
+}
 
 function getOrCreateEntry(destination: string): TopicEntry {
   let entry = topics.get(destination);
@@ -45,13 +59,37 @@ function clearStaleSubscriptions() {
   }
 }
 
+/** JWT의 만료 시각(exp)이 1분 안이거나 읽을 수 없으면 true. 서명 검증은 서버가 하고, 여기선 미리 갱신할지만 본다. */
+function isExpiringSoon(token: string): boolean {
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const { exp } = JSON.parse(atob(payload)) as { exp?: number };
+    return !exp || exp * 1000 - Date.now() < 60_000;
+  } catch {
+    return true;
+  }
+}
+
 function ensureClient(): Client {
   if (client) return client;
 
   client = new Client({
     webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws`),
     reconnectDelay: 3000,
-    onConnect: () => subscribeAllPendingTopics(client!),
+    // 연결·재연결할 때마다 그때의 토큰을 싣는다. 서버 재시작 등으로 다시 붙을 때 토큰이 만료돼 있으면
+    // 먼저 새로 받는다 — 안 그러면 만료된 토큰으로 CONNECT가 계속 거절된다.
+    beforeConnect: async (stompClient) => {
+      let token = getToken();
+      if (!token || isExpiringSoon(token)) {
+        token = (await refreshAccessToken()) ?? token;
+      }
+      stompClient.connectHeaders = { Authorization: `Bearer ${token ?? ""}` };
+    },
+    onConnect: () => {
+      subscribeAllPendingTopics(client!);
+      if (connectedBefore) reconnectListeners.forEach((listener) => listener());
+      connectedBefore = true;
+    },
     onWebSocketClose: clearStaleSubscriptions,
     onStompError: (frame) => {
       console.error("STOMP error", frame.headers["message"], frame.body);
@@ -64,7 +102,6 @@ function ensureClient(): Client {
 /** 로그인 후 한 번 호출하면 되고, 이미 연결돼 있으면 아무 일도 하지 않는다. */
 export function connectRealtime() {
   const activeClient = ensureClient();
-  activeClient.connectHeaders = { Authorization: `Bearer ${getToken() ?? ""}` };
   if (!activeClient.active) {
     activeClient.activate();
   }
@@ -73,6 +110,7 @@ export function connectRealtime() {
 export function disconnectRealtime() {
   client?.deactivate();
   clearStaleSubscriptions();
+  connectedBefore = false; // 다음 로그인의 첫 연결은 재연결이 아니다.
 }
 
 /**

@@ -30,6 +30,9 @@ public class ScheduleService {
     @Transactional(readOnly = true)
     public List<ScheduleResponse> getMonth(Long projectId, int year, int month, User currentUser) {
         projectAccessService.requireMember(projectId, currentUser);
+        if (month < 1 || month > 12 || year < 1900 || year > 9999) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "올바르지 않은 날짜입니다.");
+        }
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
 

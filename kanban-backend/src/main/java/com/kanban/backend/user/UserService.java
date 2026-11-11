@@ -4,7 +4,7 @@ import com.kanban.backend.auth.dto.UserResponse;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.user.dto.ChangePasswordRequest;
 import com.kanban.backend.user.dto.UpdateProfileRequest;
-import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,32 +24,32 @@ public class UserService {
 
     @Transactional
     public UserResponse updateProfile(User user, UpdateProfileRequest request) {
-        boolean phoneChanged = !request.phone().equals(user.getPhone());
-        if (phoneChanged && userRepository.existsByPhone(request.phone())) {
+        String phone = request.phone() == null || request.phone().isBlank() ? null : request.phone().trim();
+        // 이메일·비밀번호로 가입한 계정은 아이디 찾기(이름+휴대폰)에 휴대폰이 필요하다. 소셜 계정은 비워 둬도 된다.
+        if (phone == null && user.getPassword() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "휴대폰 번호를 입력해주세요.");
+        }
+        boolean phoneChanged = !Objects.equals(phone, user.getPhone());
+        if (phoneChanged && phone != null && userRepository.existsByPhone(phone)) {
             throw new ApiException(HttpStatus.CONFLICT, "이미 등록된 휴대폰 번호입니다.");
         }
 
-        user.changeProfile(request.name(), request.phone());
+        user.changeProfile(request.name().trim(), phone);
         User saved = userRepository.save(user);
         return UserResponse.from(saved);
     }
 
     @Transactional
     public void changePassword(User user, ChangePasswordRequest request) {
+        if (user.getPassword() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "구글·네이버로 가입한 계정은 비밀번호가 없어요.");
+        }
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다.");
         }
 
         user.changePassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
-    }
-
-    /** 멤버 초대 시 검색 후보로 전체 가입자 목록을 보여주기 위함 — 프로젝트 소속 여부와 무관. */
-    @Transactional(readOnly = true)
-    public List<UserResponse> listAll() {
-        return userRepository.findAll().stream()
-                .map(UserResponse::from)
-                .toList();
     }
 
     /** 팀원 초대 시 이메일/휴대폰번호로 이미 가입된 사용자를 찾음. */

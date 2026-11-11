@@ -7,7 +7,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.kanban.backend.common.ApiException;
-import java.util.List;
+import com.kanban.backend.user.dto.ChangePasswordRequest;
+import com.kanban.backend.user.dto.UpdateProfileRequest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,16 +38,37 @@ class UserServiceTest {
         return user;
     }
 
+    private User socialUser() {
+        User user = new User("g@gmail.com", "구글사용자", AuthProvider.GOOGLE, "google-sub");
+        ReflectionTestUtils.setField(user, "id", 9L);
+        return user;
+    }
+
     @Test
-    void listAll_returnsEveryRegisteredUser() {
-        when(userRepository.findAll()).thenReturn(List.of(
-                userWithId(1L, "a@example.com", "010-1111-1111", UserRole.OWNER),
-                userWithId(2L, "b@example.com", "010-2222-2222", UserRole.MEMBER)
-        ));
+    void updateProfile_socialAccountCanLeavePhoneEmpty() {
+        User user = socialUser();
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        List<?> result = userService.listAll();
+        userService.updateProfile(user, new UpdateProfileRequest("새 이름", ""));
 
-        assertThat(result).hasSize(2);
+        assertThat(user.getName()).isEqualTo("새 이름");
+        assertThat(user.getPhone()).isNull();
+    }
+
+    @Test
+    void updateProfile_passwordAccountStillNeedsPhone() {
+        User user = userWithId(1L, "a@example.com", "010-1111-1111", UserRole.MEMBER);
+
+        assertThatThrownBy(() -> userService.updateProfile(user, new UpdateProfileRequest("이름", "")))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("휴대폰");
+    }
+
+    @Test
+    void changePassword_socialAccountGetsClearMessage() {
+        assertThatThrownBy(() -> userService.changePassword(socialUser(), new ChangePasswordRequest("아무거나", "newPassword1")))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("비밀번호가 없어요");
     }
 
     @Test

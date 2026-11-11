@@ -124,12 +124,13 @@ export default function PersonalSettingsModal({ user, onClose, onUpdated }: Pers
             onChange={(e) => setName(e.target.value)}
             required
           />
+          {/* 구글·네이버 계정은 휴대폰이 없을 수 있어 비워 둬도 된다(서버도 같은 기준). */}
           <Field
-            label="휴대폰 번호"
+            label={confirmByPassword ? "휴대폰 번호" : "휴대폰 번호 (선택)"}
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            required
+            required={confirmByPassword}
           />
 
           {profileError && (
@@ -150,6 +151,9 @@ export default function PersonalSettingsModal({ user, onClose, onUpdated }: Pers
           </div>
         </form>
 
+        {/* 구글·네이버로 가입한 계정은 비밀번호가 없어서 바꿀 수도 없다 — 예전엔 폼이 보이고 항상 실패했다. */}
+        {confirmByPassword && (
+        <>
         <Divider />
 
         <form onSubmit={handleChangePassword} className="flex w-full flex-col gap-[14px]">
@@ -198,6 +202,8 @@ export default function PersonalSettingsModal({ user, onClose, onUpdated }: Pers
             </Button>
           </div>
         </form>
+        </>
+        )}
 
         <Divider />
 

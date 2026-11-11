@@ -123,7 +123,7 @@ public class AccountDeletionService {
         if (!blockingProjectNames.isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT,
                     "다른 팀원이 있는 프로젝트의 소유자예요: " + String.join(", ", blockingProjectNames)
-                            + ". 다른 팀원을 소유자로 지정하거나 프로젝트를 삭제한 뒤 탈퇴해주세요.");
+                            + ". 팀원 페이지에서 다른 팀원에게 소유자를 넘기거나 프로젝트를 삭제한 뒤 탈퇴해주세요.");
         }
 
         soloProjectIds.forEach(projectId -> projectService.delete(projectId, user));

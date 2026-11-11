@@ -120,6 +120,13 @@ export default function MembersPage() {
   const isOwner = myMembership?.role === "OWNER";
 
   const handleMemberUpdated = (updated: ProjectMemberDto) => {
+    if (updated.role === "OWNER") {
+      // 소유자를 넘기면 내 권한(관리자)도 바뀌므로 목록을 다시 받는다.
+      listProjectMembers(projectId)
+        .then(setMembers)
+        .catch(() => window.location.reload());
+      return;
+    }
     setMembers((prev) => prev.map((m) => (m.userId === updated.userId ? updated : m)));
   };
 
@@ -160,7 +167,7 @@ export default function MembersPage() {
                   <Pill bg={ROLE_PILL[member.role]?.bg ?? "#f3f4f6"} text={ROLE_PILL[member.role]?.text ?? "#6b7280"}>
                     {roleLabel(member.role)}
                   </Pill>
-                  {isOwner && member.userId !== currentUser?.id && (
+                  {isOwner && member.userId !== currentUser?.id && member.role !== "OWNER" && (
                     <button
                       type="button"
                       onClick={() => setEditingMember(member)}

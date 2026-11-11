@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useProjectId } from "../../hooks/useProjectId";
 import { getProject, subscribeProjectSettings } from "../../lib/projects";
+import { onRealtimeReconnect } from "../../lib/realtime";
 
 /** 지금 보고 있는 프로젝트가 보관 중이면 어느 페이지에서든 읽기 전용임을 알려 준다. */
 export default function ArchivedBanner() {
@@ -9,17 +10,22 @@ export default function ArchivedBanner() {
 
   useEffect(() => {
     let cancelled = false;
-    getProject(projectId)
-      .then((project) => {
-        if (!cancelled) setArchived(project.archived);
-      })
-      .catch(() => {
-        // 못 불러와도 화면은 그대로 쓴다 — 쓰기 요청은 어차피 서버가 막는다.
-      });
+    const load = () =>
+      getProject(projectId)
+        .then((project) => {
+          if (!cancelled) setArchived(project.archived);
+        })
+        .catch(() => {
+          // 못 불러와도 화면은 그대로 쓴다 — 쓰기 요청은 어차피 서버가 막는다.
+        });
+    void load();
     const unsubscribe = subscribeProjectSettings(projectId, (project) => setArchived(project.archived));
+    // 끊긴 동안 보관/해제됐을 수 있으니 다시 연결되면 다시 확인한다.
+    const unsubscribeReconnect = onRealtimeReconnect(() => void load());
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeReconnect();
     };
   }, [projectId]);
 

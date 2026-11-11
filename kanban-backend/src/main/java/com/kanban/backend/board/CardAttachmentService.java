@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -104,22 +105,32 @@ public class CardAttachmentService {
      * 연결된 저장소의 이슈들을 status 컬럼 맨 아래에 카드로 만든다. 제목은 "#번호 이슈 제목", 설명은 이슈 본문.
      * 이 프로젝트에 이미 가져온(또는 첨부된) 이슈는 건너뛴다. 타임라인·Slack 알림은 한 번만 보낸다.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public List<CardResponse> importGithubIssues(Long projectId, ImportGithubIssuesRequest request, User actor) {
         projectAccessService.requireMember(projectId, actor);
         String repoFullName = githubIntegrationService.linkedRepoFullName(projectId);
 
-        List<Card> created = new ArrayList<>();
+        // 1) GitHub에서 이슈를 먼저 다 받아 온다 — 보드를 잠근 채로 외부 API를 기다리면 그동안 이 프로젝트의 카드 이동이 다 멈춘다.
+        List<GithubIssueDetail> issues = new ArrayList<>();
         for (Long number : request.issueNumbers().stream().distinct().toList()) {
             if (number == null || number <= 0) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "올바르지 않은 이슈 번호입니다.");
             }
-            String externalId = issueExternalId(repoFullName, number);
+            if (!attachmentRepository.existsByProjectIdAndKindAndExternalId(
+                    projectId, AttachmentKind.GITHUB_ISSUE, issueExternalId(repoFullName, number))) {
+                issues.add(githubIntegrationService.getIssue(projectId, number));
+            }
+        }
+
+        // 2) 보드를 잠그고 카드를 만든다 (CardService.create와 같은 이유 — 동시에 카드를 추가·이동하면 position이 겹친다).
+        cardService.lockBoard(projectId);
+        List<Card> created = new ArrayList<>();
+        for (GithubIssueDetail issue : issues) {
+            String externalId = issueExternalId(repoFullName, issue.number());
+            // 잠금을 기다리는 사이 다른 사람이 같은 이슈를 가져왔을 수 있다.
             if (attachmentRepository.existsByProjectIdAndKindAndExternalId(projectId, AttachmentKind.GITHUB_ISSUE, externalId)) {
                 continue;
             }
-
-            GithubIssueDetail issue = githubIntegrationService.getIssue(projectId, number);
             String issueTitle = "#%d %s".formatted(issue.number(), issue.title());
             Card card = cardService.createImported(
                     projectId,

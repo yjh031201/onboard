@@ -7,6 +7,7 @@ import com.kanban.backend.project.dto.ProjectMemberResponse;
 import com.kanban.backend.project.dto.UpdateMemberRoleRequest;
 import com.kanban.backend.user.User;
 import com.kanban.backend.user.UserRepository;
+import com.kanban.backend.user.UserRole;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,10 @@ public class ProjectMemberService {
     @Transactional
     public ProjectMemberResponse invite(Long projectId, InviteMemberRequest request, User actor) {
         projectAccessService.requireAdmin(projectId, actor);
+        // 소유자는 프로젝트마다 한 명 — 초대로는 만들 수 없고, 소유자가 직접 넘겨야 한다(changeRole).
+        if (request.role() == UserRole.OWNER) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "소유자로는 초대할 수 없어요. 팀원이 된 뒤 소유자가 넘겨줄 수 있어요.");
+        }
         User target = findUser(request.userId());
 
         projectMemberRepository.findByProjectIdAndUserId(projectId, target.getId()).ifPresent(existing -> {
@@ -65,14 +70,27 @@ public class ProjectMemberService {
         return ProjectMemberResponse.from(member, target);
     }
 
-    /** 멤버 권한 변경 — OWNER만, 이미 수락한 멤버만 대상. ADMIN은 초대는 할 수 있어도 다른 사람의 권한은 못 바꾼다. */
+    /**
+     * 멤버 권한 변경 — OWNER만, 이미 수락한 다른 멤버만 대상. ADMIN은 초대는 할 수 있어도 다른 사람의 권한은 못 바꾼다.
+     * 소유자는 항상 한 명이다: OWNER로 바꾸면 "소유자 넘기기"가 되어 대상은 OWNER, 나는 ADMIN이 된다.
+     * 내 권한·다른 소유자의 권한은 바꿀 수 없다 — 소유자 없는 프로젝트나 소유자끼리 서로 강등하는 일을 막는다.
+     */
     @Transactional
     public ProjectMemberResponse changeRole(Long projectId, Long userId, UpdateMemberRoleRequest request, User actor) {
-        projectAccessService.requireOwner(projectId, actor);
+        ProjectMember actorMember = projectAccessService.requireOwner(projectId, actor);
+        if (userId.equals(actor.getId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "내 권한은 바꿀 수 없어요. 다른 팀원에게 소유자를 넘기면 관리자가 돼요.");
+        }
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserIdAndStatus(projectId, userId, InviteStatus.ACCEPTED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "이 프로젝트의 멤버가 아닙니다."));
+        if (member.getRole() == UserRole.OWNER) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "소유자의 권한은 바꿀 수 없어요.");
+        }
 
         member.changeRole(request.role());
+        if (request.role() == UserRole.OWNER) {
+            actorMember.changeRole(UserRole.ADMIN);
+        }
         return ProjectMemberResponse.from(member, findUser(userId));
     }
 

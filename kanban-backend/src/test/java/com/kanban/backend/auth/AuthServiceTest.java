@@ -3,7 +3,10 @@ package com.kanban.backend.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.kanban.backend.auth.dto.AuthResponse;
@@ -11,7 +14,6 @@ import com.kanban.backend.auth.dto.FindIdRequest;
 import com.kanban.backend.auth.dto.FindIdResponse;
 import com.kanban.backend.auth.oauth2.OAuthCodeExchangeService;
 import com.kanban.backend.auth.dto.LoginRequest;
-import com.kanban.backend.auth.dto.ResetPasswordRequest;
 import com.kanban.backend.auth.dto.SignupRequest;
 import com.kanban.backend.common.ApiException;
 import com.kanban.backend.config.JwtTokenProvider;
@@ -142,28 +144,7 @@ class AuthServiceTest {
                 .hasMessageContaining("일치하는 회원 정보");
     }
 
-    @Test
-    void resetPassword_updatesPasswordWhenNameAndEmailMatch() {
-        User user = new User("jdbdjhd8q@gmail.com", passwordEncoder.encode("oldPassword1"), "양종호", "010-1234-5678");
-        ReflectionTestUtils.setField(user, "id", 1L);
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-
-        authService.resetPassword(new ResetPasswordRequest("양종호", user.getEmail(), "newPassword1"));
-
-        assertThat(passwordEncoder.matches("newPassword1", user.getPassword())).isTrue();
-    }
-
-    @Test
-    void resetPassword_rejectsWhenNameDoesNotMatch() {
-        User user = new User("jdbdjhd8q@gmail.com", passwordEncoder.encode("oldPassword1"), "양종호", "010-1234-5678");
-        ReflectionTestUtils.setField(user, "id", 1L);
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-
-        assertThatThrownBy(() ->
-                authService.resetPassword(new ResetPasswordRequest("다른사람", user.getEmail(), "newPassword1")))
-                .isInstanceOf(ApiException.class)
-                .hasMessageContaining("일치하는 회원 정보");
-    }
+    // 비밀번호 재설정 테스트는 이메일 인증 코드 방식으로 바뀌면서 PasswordResetServiceTest로 옮겼다.
 
     @Test
     void login_rejectsSocialOnlyAccountWithoutPassword() {
@@ -187,6 +168,19 @@ class AuthServiceTest {
 
         assertThat(result.body().accessToken()).isEqualTo("fake-jwt-token");
         assertThat(result.body().user().email()).isEqualTo(user.getEmail());
+        // 쓴 토큰만 버리고 새로 저장한다 — 다른 기기의 로그인(전체 무효화)은 건드리지 않는다.
+        verify(refreshTokenStore).revoke(1L, "valid-refresh-token");
+        verify(refreshTokenStore, never()).invalidate(anyLong());
+    }
+
+    @Test
+    void logout_revokesOnlyThisDevicesToken() {
+        when(jwtTokenProvider.parseRefreshUserId("this-device-token")).thenReturn(Optional.of(1L));
+
+        authService.logout("this-device-token");
+
+        verify(refreshTokenStore).revoke(1L, "this-device-token");
+        verify(refreshTokenStore, never()).invalidate(anyLong());
     }
 
     @Test

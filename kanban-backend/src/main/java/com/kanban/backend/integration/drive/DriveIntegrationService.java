@@ -172,8 +172,9 @@ public class DriveIntegrationService {
         if (!integration.isTokenExpired()) {
             return integration.getAccessToken();
         }
+        // 401을 쓰면 프론트가 "앱 로그인이 만료됐다"로 보고 로그아웃시키므로, 연동 만료는 409로 알린다.
         if (integration.getRefreshToken() == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Google Drive 연동이 만료됐어요. 다시 연결해주세요.");
+            throw driveExpired();
         }
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -182,15 +183,25 @@ public class DriveIntegrationService {
         form.add("refresh_token", integration.getRefreshToken());
         form.add("grant_type", "refresh_token");
 
-        JsonNode token = requestToken(form);
+        JsonNode token;
+        try {
+            token = requestToken(form);
+        } catch (RestClientResponseException e) {
+            // 사용자가 구글 계정에서 접근 권한을 해제했거나 refresh token이 만료된 경우 (invalid_grant 등).
+            throw driveExpired();
+        }
         String accessToken = token.path("access_token").asText(null);
         long expiresIn = token.path("expires_in").asLong(3600);
         if (accessToken == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Google Drive 연동이 만료됐어요. 다시 연결해주세요.");
+            throw driveExpired();
         }
 
         integration.updateTokens(accessToken, null, LocalDateTime.now().plusSeconds(expiresIn));
         return accessToken;
+    }
+
+    private static ApiException driveExpired() {
+        return new ApiException(HttpStatus.CONFLICT, "Google Drive 연동이 만료됐어요. 다시 연결해주세요.");
     }
 
     private JsonNode requestToken(MultiValueMap<String, String> form) {
